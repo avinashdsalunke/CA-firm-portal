@@ -61,6 +61,13 @@ class Accounting {
      */
     public static function createInvoice($clientId, $invoiceNumber, $amount, $issueDate, $dueDate, $description = null, $cgst = 0, $sgst = 0, $igst = 0, $tds_amount = 0, $net_amount = null, $invoice_design = null) {
         $db = Database::getConnection();
+        // Check for duplicate invoice number
+        $stmtCheck = $db->prepare("SELECT id FROM accounting_invoices WHERE invoice_number = :num LIMIT 1");
+        $stmtCheck->execute(['num' => $invoiceNumber]);
+        if ($stmtCheck->fetch()) {
+            return ["error" => "Invoice number '$invoiceNumber' already exists. Please use a unique invoice number."];
+        }
+
         if ($net_amount === null) {
             $net_amount = floatval($amount) + floatval($cgst) + floatval($sgst) + floatval($igst) - floatval($tds_amount);
         }
@@ -482,5 +489,30 @@ class Accounting {
         } catch (PDOException $e) {
             return ["error" => "Database error: " . $e->getMessage()];
         }
+    }
+
+    public static function getNextInvoiceNumber() {
+        $db = Database::getConnection();
+        $year = date('Y');
+        $stmt = $db->prepare("SELECT invoice_number FROM accounting_invoices WHERE invoice_number LIKE :prefix");
+        $stmt->execute(['prefix' => "INV-$year-%"]);
+        $numbers = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        $maxNum = 0;
+        $maxLen = 2; // Default to 2 digits (e.g. 01, 13)
+        
+        foreach ($numbers as $numStr) {
+            if (preg_match('/INV-\d+-(\d+)$/', $numStr, $matches)) {
+                $val = intval($matches[1]);
+                if ($val > $maxNum) {
+                    $maxNum = $val;
+                    $maxLen = strlen($matches[1]);
+                }
+            }
+        }
+        
+        $nextVal = $maxNum + 1;
+        $nextNumStr = str_pad($nextVal, $maxLen, '0', STR_PAD_LEFT);
+        return "INV-$year-$nextNumStr";
     }
 }

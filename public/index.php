@@ -122,7 +122,10 @@ if (!$isAdmin && !in_array($activeTab, ['dashboard', 'tasks', 'logs', 'complianc
 }
 
 $error = null;
-$success = null;
+$success = $_SESSION['flash_success'] ?? null;
+if ($success) {
+    unset($_SESSION['flash_success']);
+}
 
 // Controller dispatching for POST actions (MVC pattern)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -206,8 +209,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($res) {
             if (isset($res['success'])) {
-                $success = $res['success'];
+                $_SESSION['flash_success'] = $res['success'];
                 Cache::delete('dashboard_stats');
+                
+                // PRG Pattern: Redirect to self with clean GET params to prevent duplicate submissions on refresh
+                $redirectUrl = 'index.php?' . http_build_query($_GET);
+                header('Location: ' . $redirectUrl);
+                exit;
             }
             if (isset($res['error'])) $error = $res['error'];
         }
@@ -505,6 +513,10 @@ function isActive($tab, $activeTab) {
 
             <!-- ================== DASHBOARD TAB ================== -->
             <?php if ($activeTab === 'dashboard'): 
+                if (isset($_GET['refresh'])) {
+                    Cache::delete('dashboard_stats');
+                    Cache::delete('financial_stats');
+                }
                 // Caching layer for dashboard performance optimization
                 $cached = Cache::get('dashboard_stats');
                 if ($cached) {
@@ -651,6 +663,14 @@ function isActive($tab, $activeTab) {
                     }
                 }
             ?>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; width:100%;" class="no-print">
+                    <h3 style="font-size:1.15rem; font-weight:700; color:var(--text-main); margin:0; display:flex; align-items:center; gap:0.5rem;">
+                        <i data-lucide="activity" style="color:var(--primary); width:18px;"></i> Overview Statistics
+                    </h3>
+                    <a href="index.php?tab=dashboard&refresh=1" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.75rem; font-size:0.8rem;">
+                        <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i> Sync & Refresh Stats
+                    </a>
+                </div>
                 <!-- Advanced KPI Analytics Grid -->
                 <div class="grid-stats">
                     <div class="stat-card glass-card">
@@ -5357,7 +5377,7 @@ function isActive($tab, $activeTab) {
                                     </div>
                                     <div class="form-group">
                                         <label for="inv-num" class="form-label">Invoice Number</label>
-                                        <input type="text" id="inv-num" name="invoice_number" class="form-control" required placeholder="e.g. INV-2026-001">
+                                        <input type="text" id="inv-num" name="invoice_number" class="form-control" required placeholder="e.g. INV-2026-001" value="<?= Accounting::getNextInvoiceNumber() ?>">
                                     </div>
                                     
                                      <!-- Multiple Services Manager -->
