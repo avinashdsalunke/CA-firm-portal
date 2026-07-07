@@ -1,0 +1,109 @@
+<?php
+// src/AIService.php
+
+class AIService {
+    /**
+     * Parse User Chat Prompts
+     */
+    public static function chatResponse($prompt) {
+        $p = strtolower(trim($prompt));
+
+        if (strpos($p, 'due date') !== false || strpos($p, 'compliance') !== false || strpos($p, 'gstr') !== false) {
+            return "Here are the key statutory tax deadlines:\n- GSTR-1: 11th of every succeeding month.\n- GSTR-3B: 20th of every succeeding month.\n- Income Tax Return (Individual): 31st July.\n- Corporate Audit Returns: 30th September.";
+        }
+
+        if (strpos($p, 'backup') !== false || strpos($p, 'db') !== false) {
+            return "To execute database backups, navigate to the [Automation Hub](index.php?tab=automation). Backups are saved in `public/uploads/backups/` and can be manually triggered there.";
+        }
+
+        if (strpos($p, 'invoice') !== false || strpos($p, 'bill') !== false) {
+            return "You can generate custom billing invoices in the [Accounting](index.php?tab=accounting) tab. Automated retainer monthly invoices are created on the 1st of each month via the cron engine.";
+        }
+
+        if (strpos($p, 'security') !== false || strpos($p, '2fa') !== false) {
+            return "Account safety features are under the [Security](index.php?tab=security) tab. There you can configure 2FA, view active logged-in device sessions, and whitelist IP addresses.";
+        }
+
+        return "I am your CA Firm AI Assistant. You can ask me about:\n- Tax due dates (GSTR-1, ITR etc.)\n- Database backups and crons\n- Invoicing and billing\n- Account security settings and 2FA";
+    }
+
+    /**
+     * Generate templated email drafts
+     */
+    public static function generateEmailDraft($clientName, $topic) {
+        $clientName = htmlspecialchars($clientName);
+        if (strpos(strtolower($topic), 'invoice') !== false || strpos(strtolower($topic), 'outstanding') !== false) {
+            return "Dear $clientName,\n\nWe hope you are doing well.\n\nThis is a friendly alert that invoice #INV-XXXX is currently outstanding. Kindly arrange for the settlement of the dues at your earliest convenience.\n\nBest Regards,\nCA Accounts Desk";
+        }
+        return "Dear $clientName,\n\nThis is to notify you regarding your upcoming return filing obligations. Please ensure all requested invoices and statements are uploaded to the document vault.\n\nBest Regards,\nCA CRM Support Office";
+    }
+
+    /**
+     * Suggest checklists for common tasks
+     */
+    public static function suggestSubtasks($taskTitle) {
+        $t = strtolower($taskTitle);
+        if (strpos($t, 'audit') !== false) {
+            return "- [ ] Fetch bank statements and ledgers\n- [ ] Reconcile cash and purchase transactions\n- [ ] Verify fixed asset purchases\n- [ ] Prepare draft Balance Sheet and P&L statements";
+        }
+        if (strpos($t, 'gst') !== false || strpos($t, 'gstr') !== false) {
+            return "- [ ] Export sales register\n- [ ] Match input tax credit (ITC) against GSTR-2B\n- [ ] Reconcile differences in sales declarations\n- [ ] File return and record ARN details";
+        }
+        return "- [ ] Collect initial client files\n- [ ] Review documentation checklist\n- [ ] Prepare calculation worksheet\n- [ ] Finalize filing submission draft";
+    }
+
+    /**
+     * Summarize P&L report data
+     */
+    public static function summarizeReport($data) {
+        $billed = floatval($data['billed_revenue'] ?? 0);
+        $collected = floatval($data['collected_revenue'] ?? 0);
+        $expenses = floatval($data['total_expenses'] ?? 0);
+        $profit = floatval($data['net_profit'] ?? 0);
+        $margin = floatval($data['profit_margin'] ?? 0);
+
+        $summary = "### AI Executive Financial Summary\n";
+        $summary .= "- **Revenue Analysis**: The firm billed a total of ₹" . number_format($billed, 2) . " and collected ₹" . number_format($collected, 2) . " over this period.\n";
+        $summary .= "- **Outflow**: Operating expenses and payroll payroll total ₹" . number_format($expenses, 2) . ".\n";
+        $summary .= "- **Net Results**: The net profit is ₹" . number_format($profit, 2) . " with an operating profit margin of **$margin%**.\n";
+
+        if ($profit > 0) {
+            $summary .= "- **AI Diagnostic**: The practice is running profitably. To further optimize liquidity, verify outstanding unpaid billing invoices.";
+        } else {
+            $summary .= "- **AI Diagnostic**: High operating costs detected. Review payroll salary distributions and cut discretionary admin overheads.";
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Generate dynamic compliance reminders
+     */
+    public static function generateComplianceReminder($clientName, $filingName, $dueDate) {
+        return "Dear " . htmlspecialchars($clientName) . ", this is a reminder that your filing for " . htmlspecialchars($filingName) . " is due on " . htmlspecialchars($dueDate) . ". Please submit documents.";
+    }
+
+    /**
+     * Analyze dashboard indicators to suggest insights
+     */
+    public static function generateDashboardInsights($kpi) {
+        $outstanding = floatval($kpi['outstanding'] ?? 0);
+        $insights = [];
+
+        if ($outstanding > 20000) {
+            $insights[] = [
+                'type' => 'warning',
+                'title' => 'Liquidity Warning',
+                'desc' => "Unpaid receivables are high (₹" . number_format($outstanding, 2) . "). Trigger email outstanding reminders."
+            ];
+        }
+
+        $insights[] = [
+            'type' => 'info',
+            'title' => 'Filing Deadline Reminder',
+            'desc' => "GSTR-1 filing dates are approaching. Ensure GST sales registers are exported soon."
+        ];
+
+        return $insights;
+    }
+}
