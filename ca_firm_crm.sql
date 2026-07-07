@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 07, 2026 at 09:42 PM
+-- Generation Time: Jul 07, 2026 at 10:58 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -77,7 +77,10 @@ CREATE TABLE `accounting_invoices` (
 INSERT INTO `accounting_invoices` (`id`, `client_id`, `invoice_number`, `amount`, `status`, `issue_date`, `due_date`, `description`, `created_at`, `updated_at`, `cgst`, `sgst`, `igst`, `tds_amount`, `net_amount`, `invoice_design`) VALUES
 (4, 3, 'INV-2026-09', 3000.00, 'paid', '2026-07-07', '2026-08-06', '', '2026-07-07 10:11:46', '2026-07-07 12:24:57', 270.00, 270.00, 0.00, 0.00, 3540.00, ''),
 (5, 3, 'INV-2026-10', 3000.00, 'paid', '2026-07-07', '2026-08-06', '', '2026-07-07 10:33:22', '2026-07-07 12:24:50', 270.00, 270.00, 0.00, 0.00, 3540.00, ''),
-(6, 3, 'INV-2026-11', 15000.00, 'paid', '2026-07-07', '2026-08-06', '', '2026-07-07 12:25:32', '2026-07-07 12:25:40', 0.00, 0.00, 0.00, 0.00, 15000.00, '');
+(6, 3, 'INV-2026-11', 15000.00, 'paid', '2026-07-07', '2026-08-06', '', '2026-07-07 12:25:32', '2026-07-07 12:25:40', 0.00, 0.00, 0.00, 0.00, 15000.00, ''),
+(7, 4, 'INV-2026-12', 8000.00, 'unpaid', '2026-07-07', '2026-08-06', '', '2026-07-07 19:46:36', '2026-07-07 19:46:36', 720.00, 720.00, 0.00, 0.00, 9440.00, ''),
+(12, 4, 'INV-2026-13', 7000.00, 'unpaid', '2026-07-07', '2026-08-06', 'GST Audit Filings: ₹4500.00\r\nITR-1 Consultation & Filing: ₹2500.00', '2026-07-07 20:41:16', '2026-07-07 20:41:16', 630.00, 630.00, 0.00, 0.00, 8260.00, ''),
+(13, 3, 'INV-2026-14', 15000.00, 'unpaid', '2026-07-07', '2026-08-06', 'Corporate Tax Audit Return: ₹15000.00', '2026-07-07 20:45:38', '2026-07-07 20:45:38', 1350.00, 1350.00, 0.00, 0.00, 17700.00, '');
 
 -- --------------------------------------------------------
 
@@ -196,7 +199,14 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `action`, `details`, `ip_address`,
 (71, 1, 'delete_compliance', 'Deleted compliance ID 15', '::1', '2026-07-07 19:25:09'),
 (72, 1, 'add_compliance', 'Created compliance task \'gst2\' for client ID 3', '::1', '2026-07-07 19:25:38'),
 (73, 1, 'generate_token', 'Generated portal token for client ID 4', '::1', '2026-07-07 19:31:56'),
-(74, 3, 'clock_out', 'Employee clocked out at 21:35:10', '::1', '2026-07-07 19:35:10');
+(74, 3, 'clock_out', 'Employee clocked out at 21:35:10', '::1', '2026-07-07 19:35:10'),
+(75, 1, 'add_invoice', 'Generated invoice INV-2026-12', '::1', '2026-07-07 19:46:36'),
+(76, 3, 'update_task_status', 'Updated task ID 6 status to completed', '::1', '2026-07-07 19:48:48'),
+(77, 1, 'add_task', 'Created task: roc', '::1', '2026-07-07 19:55:18'),
+(78, 1, 'add_invoice', 'Generated invoice INV-2026-13', '::1', '2026-07-07 20:28:07'),
+(79, 1, 'add_invoice', 'Generated invoice INV-2026-13', '::1', '2026-07-07 20:36:14'),
+(80, 1, 'add_invoice', 'Generated invoice INV-2026-13', '::1', '2026-07-07 20:41:16'),
+(81, 1, 'add_invoice', 'Generated invoice INV-2026-14', '::1', '2026-07-07 20:45:38');
 
 -- --------------------------------------------------------
 
@@ -333,16 +343,22 @@ CREATE TABLE `clients` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `deleted_at` timestamp NULL DEFAULT NULL,
-  `encrypted_tax_data` text DEFAULT NULL
+  `encrypted_tax_data` text DEFAULT NULL,
+  `pan` varchar(50) DEFAULT NULL,
+  `gstin` varchar(50) DEFAULT NULL,
+  `tan` varchar(50) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `client_type` varchar(50) DEFAULT NULL,
+  `incorporation_date` date DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `clients`
 --
 
-INSERT INTO `clients` (`id`, `name`, `email`, `phone`, `portal_token`, `portal_token_expires_at`, `created_at`, `updated_at`, `deleted_at`, `encrypted_tax_data`) VALUES
-(3, 'raviraj industry', 'avinashsalunkehoh@gmail.com', '8830666253', '0101387134099bfa131fd3bd24eca1ec253efb9d1f268117ac86c24222b9f9d5', '2026-07-14 06:52:13', '2026-07-07 09:14:47', '2026-07-07 10:22:13', NULL, NULL),
-(4, 'kiran industry', 'kiran@gmail.com', '6565656565', 'acd36f7f9bb15aa658009b434a4422a1eb27bc1de1d6ba7815023d82613b9b62', '2026-07-14 16:01:56', '2026-07-07 12:26:24', '2026-07-07 19:31:56', NULL, NULL);
+INSERT INTO `clients` (`id`, `name`, `email`, `phone`, `portal_token`, `portal_token_expires_at`, `created_at`, `updated_at`, `deleted_at`, `encrypted_tax_data`, `pan`, `gstin`, `tan`, `address`, `client_type`, `incorporation_date`) VALUES
+(3, 'raviraj industry', 'avinashsalunkehoh@gmail.com', '8830666253', '0101387134099bfa131fd3bd24eca1ec253efb9d1f268117ac86c24222b9f9d5', '2026-07-14 06:52:13', '2026-07-07 09:14:47', '2026-07-07 10:22:13', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(4, 'kiran industry', 'kiran@gmail.com', '6565656565', 'acd36f7f9bb15aa658009b434a4422a1eb27bc1de1d6ba7815023d82613b9b62', '2026-07-14 16:01:56', '2026-07-07 12:26:24', '2026-07-07 19:31:56', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -427,7 +443,14 @@ INSERT INTO `client_timeline` (`id`, `client_id`, `user_id`, `event_type`, `desc
 (77, 3, NULL, 'compliance_created', 'Compliance task \'gst\' added (Due: 2026-07-08).', '2026-07-07 19:24:44'),
 (78, 3, NULL, 'compliance_deleted', 'Compliance return \'gst\' deleted.', '2026-07-07 19:25:09'),
 (79, 3, NULL, 'compliance_created', 'Compliance task \'gst2\' added (Due: 2026-07-08).', '2026-07-07 19:25:38'),
-(80, 4, NULL, 'token_generated', 'Secure portal access token generated (valid for 7 days).', '2026-07-07 19:31:56');
+(80, 4, NULL, 'token_generated', 'Secure portal access token generated (valid for 7 days).', '2026-07-07 19:31:56'),
+(81, 4, NULL, 'invoice_created', 'Invoice #INV-2026-12 for amount 8000 (Net: 9440) created.', '2026-07-07 19:46:36'),
+(82, 4, NULL, 'task_status_changed', 'Task \'TDS\' status updated to completed.', '2026-07-07 19:48:48'),
+(83, 4, NULL, 'task_created', 'Task \'roc\' created and assigned.', '2026-07-07 19:55:18'),
+(84, 4, NULL, 'invoice_created', 'Invoice #INV-2026-13 for amount 7000 (Net: 8260) created.', '2026-07-07 20:28:07'),
+(85, 4, NULL, 'invoice_created', 'Invoice #INV-2026-13 for amount 7000 (Net: 8260) created.', '2026-07-07 20:36:14'),
+(86, 4, NULL, 'invoice_created', 'Invoice #INV-2026-13 for amount 7000 (Net: 8260) created.', '2026-07-07 20:41:16'),
+(87, 3, NULL, 'invoice_created', 'Invoice #INV-2026-14 for amount 15000 (Net: 17700) created.', '2026-07-07 20:45:38');
 
 -- --------------------------------------------------------
 
@@ -452,18 +475,21 @@ CREATE TABLE `compliances` (
   `email_reminders_sent` int(11) DEFAULT 0,
   `sms_reminders_sent` int(11) DEFAULT 0,
   `escalated` tinyint(1) DEFAULT 0,
-  `escalated_at` timestamp NULL DEFAULT NULL
+  `escalated_at` timestamp NULL DEFAULT NULL,
+  `financial_year` varchar(50) DEFAULT NULL,
+  `assessment_year` varchar(50) DEFAULT NULL,
+  `periodicity` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `compliances`
 --
 
-INSERT INTO `compliances` (`id`, `client_id`, `title`, `category`, `due_date`, `filing_date`, `acknowledgement_number`, `status`, `notes`, `created_at`, `updated_at`, `client_response`, `client_responded_at`, `email_reminders_sent`, `sms_reminders_sent`, `escalated`, `escalated_at`) VALUES
-(12, 3, 'tds', 'TDS Return', '2026-07-08', '2026-07-07', 'ACN12589', 'filed', 'tested', '2026-07-07 09:21:34', '2026-07-07 09:24:21', NULL, NULL, 0, 0, 0, NULL),
-(13, 4, 'TDS', 'TDS Return', '2026-07-07', '2026-07-07', 'ARN23429', 'filed', 'tested', '2026-07-07 12:35:46', '2026-07-07 15:43:30', NULL, NULL, 0, 0, 0, NULL),
-(14, 3, 'rco', 'ROC', '2026-07-07', '2026-07-07', 'ARN2342', 'filed', 'done', '2026-07-07 12:46:22', '2026-07-07 15:43:17', NULL, NULL, 0, 0, 0, NULL),
-(16, 3, 'gst2', 'GST Return', '2026-07-08', NULL, NULL, 'pending', 'temp', '2026-07-07 19:25:38', '2026-07-07 19:25:38', NULL, NULL, 0, 0, 0, NULL);
+INSERT INTO `compliances` (`id`, `client_id`, `title`, `category`, `due_date`, `filing_date`, `acknowledgement_number`, `status`, `notes`, `created_at`, `updated_at`, `client_response`, `client_responded_at`, `email_reminders_sent`, `sms_reminders_sent`, `escalated`, `escalated_at`, `financial_year`, `assessment_year`, `periodicity`) VALUES
+(12, 3, 'tds', 'TDS Return', '2026-07-08', '2026-07-07', 'ACN12589', 'filed', 'tested', '2026-07-07 09:21:34', '2026-07-07 09:24:21', NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL),
+(13, 4, 'TDS', 'TDS Return', '2026-07-07', '2026-07-07', 'ARN23429', 'filed', 'tested', '2026-07-07 12:35:46', '2026-07-07 15:43:30', NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL),
+(14, 3, 'rco', 'ROC', '2026-07-07', '2026-07-07', 'ARN2342', 'filed', 'done', '2026-07-07 12:46:22', '2026-07-07 15:43:17', NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL),
+(16, 3, 'gst2', 'GST Return', '2026-07-08', NULL, NULL, 'pending', 'temp', '2026-07-07 19:25:38', '2026-07-07 19:25:38', NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -780,7 +806,11 @@ INSERT INTO `login_logs` (`id`, `user_id`, `email_attempted`, `ip_address`, `use
 (70, 1, 'test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 17:59:19'),
 (71, 1, 'test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 19:09:17'),
 (72, 3, 'staff1@example.test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 19:34:48'),
-(73, 1, 'test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 19:35:53');
+(73, 1, 'test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 19:35:53'),
+(74, 3, 'staff1@example.test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 19:48:28'),
+(75, 1, 'test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 19:54:43'),
+(76, 1, 'test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 20:51:41'),
+(77, 1, 'test', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', 'success', '2026-07-07 20:55:21');
 
 -- --------------------------------------------------------
 
@@ -1078,17 +1108,22 @@ CREATE TABLE `tasks` (
   `due_date` date DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` timestamp NULL DEFAULT NULL
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `financial_year` varchar(50) DEFAULT NULL,
+  `assessment_year` varchar(50) DEFAULT NULL,
+  `periodicity` varchar(50) DEFAULT NULL,
+  `estimated_fees` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `tasks`
 --
 
-INSERT INTO `tasks` (`id`, `client_id`, `assigned_to_user_id`, `title`, `description`, `status`, `priority`, `category`, `due_date`, `created_at`, `updated_at`, `deleted_at`) VALUES
-(4, 3, 3, 'GST', 'new GST augst', 'completed', 'medium', 'gst,tds', '2026-07-08', '2026-07-07 09:20:39', '2026-07-07 09:23:52', NULL),
-(5, 4, 4, 'ITR', 'file ITR in sapt 2026', 'completed', 'medium', 'ITR', '2026-09-01', '2026-07-07 12:31:55', '2026-07-07 15:42:50', NULL),
-(6, 4, 3, 'TDS', 'fixed', 'pending', 'medium', 'TDS', '2026-07-07', '2026-07-07 12:45:07', '2026-07-07 12:45:07', NULL);
+INSERT INTO `tasks` (`id`, `client_id`, `assigned_to_user_id`, `title`, `description`, `status`, `priority`, `category`, `due_date`, `created_at`, `updated_at`, `deleted_at`, `financial_year`, `assessment_year`, `periodicity`, `estimated_fees`) VALUES
+(4, 3, 3, 'GST', 'new GST augst', 'completed', 'medium', 'gst,tds', '2026-07-08', '2026-07-07 09:20:39', '2026-07-07 09:23:52', NULL, NULL, NULL, NULL, NULL),
+(5, 4, 4, 'ITR', 'file ITR in sapt 2026', 'completed', 'medium', 'ITR', '2026-09-01', '2026-07-07 12:31:55', '2026-07-07 15:42:50', NULL, NULL, NULL, NULL, NULL),
+(6, 4, 3, 'TDS', 'fixed', 'completed', 'medium', 'TDS', '2026-07-07', '2026-07-07 12:45:07', '2026-07-07 19:48:48', NULL, NULL, NULL, NULL, NULL),
+(7, 4, 4, 'roc', 'temp', 'pending', 'medium', 'roc', '2026-07-08', '2026-07-07 19:55:18', '2026-07-07 19:55:18', NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1239,7 +1274,11 @@ INSERT INTO `user_sessions` (`id`, `user_id`, `session_token`, `ip_address`, `us
 (20, 1, 'd787abe1bfd447e98afdef92a1a575b8e4b0a0444a4fd761ad5f65446b3dc784', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 17:59:19'),
 (21, 1, '59b73058900c5deb9aa1fa61e30baafab5432a0a9bc7032013cd1de96c2bb6fb', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 19:09:17'),
 (22, 3, '016a721ece033d5e4533fb2f7964061f07c0658d112c1a842074abd5e86ce6fc', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 19:34:48'),
-(23, 1, '8239a0cd7d23a0ee24fb7b215b70ed5c4842e86c638d31fdea5ec99003bc2416', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 19:35:53');
+(23, 1, '8239a0cd7d23a0ee24fb7b215b70ed5c4842e86c638d31fdea5ec99003bc2416', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 19:35:53'),
+(24, 3, 'ef77fc516c3b2d91c7de5c77d444ffc792a7b21e93b9ee244e6d55639873dc7a', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 19:48:28'),
+(25, 1, '79203f89058c44acd6f221f4e92fa36d147af3f0b597c85f42db73591a3e6ec4', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 19:54:43'),
+(26, 1, '6cdc7061c11d84007dbf2dec29e00ba46d06d34cfbf8517dbbee1ec2e33fd9c8', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 20:51:41'),
+(27, 1, 'f9b05a3fd06fecb0a74a6471da05192a8cef79cdf26937dcfb10aad6a47f5d3a', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', '2026-07-07 20:55:21');
 
 -- --------------------------------------------------------
 
@@ -1631,7 +1670,7 @@ ALTER TABLE `accounting_expenses`
 -- AUTO_INCREMENT for table `accounting_invoices`
 --
 ALTER TABLE `accounting_invoices`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `accounting_payments`
@@ -1643,7 +1682,7 @@ ALTER TABLE `accounting_payments`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=75;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
 
 --
 -- AUTO_INCREMENT for table `announcements`
@@ -1697,7 +1736,7 @@ ALTER TABLE `client_notes`
 -- AUTO_INCREMENT for table `client_timeline`
 --
 ALTER TABLE `client_timeline`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=81;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=88;
 
 --
 -- AUTO_INCREMENT for table `compliances`
@@ -1769,7 +1808,7 @@ ALTER TABLE `leave_requests`
 -- AUTO_INCREMENT for table `login_logs`
 --
 ALTER TABLE `login_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=74;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=78;
 
 --
 -- AUTO_INCREMENT for table `meetings`
@@ -1841,7 +1880,7 @@ ALTER TABLE `sms_logs`
 -- AUTO_INCREMENT for table `tasks`
 --
 ALTER TABLE `tasks`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `tenants`
@@ -1865,7 +1904,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `user_sessions`
 --
 ALTER TABLE `user_sessions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `whatsapp_logs`
