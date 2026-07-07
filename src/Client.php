@@ -39,14 +39,20 @@ class Client {
     /**
      * Create client
      */
-    public static function createClient($name, $email, $phone = null) {
+    public static function createClient($name, $email, $phone = null, $pan = null, $gstin = null, $tan = null, $address = null, $client_type = null, $incorporation_date = null) {
         $db = Database::getConnection();
         try {
-            $stmt = $db->prepare("INSERT INTO clients (name, email, phone) VALUES (:name, :email, :phone)");
+            $stmt = $db->prepare("INSERT INTO clients (name, email, phone, pan, gstin, tan, address, client_type, incorporation_date) VALUES (:name, :email, :phone, :pan, :gstin, :tan, :address, :client_type, :incorporation_date)");
             $stmt->execute([
                 'name' => $name,
                 'email' => $email,
-                'phone' => $phone
+                'phone' => $phone,
+                'pan' => empty($pan) ? null : strtoupper(trim($pan)),
+                'gstin' => empty($gstin) ? null : strtoupper(trim($gstin)),
+                'tan' => empty($tan) ? null : strtoupper(trim($tan)),
+                'address' => empty($address) ? null : trim($address),
+                'client_type' => empty($client_type) ? null : trim($client_type),
+                'incorporation_date' => empty($incorporation_date) ? null : $incorporation_date
             ]);
             $clientId = $db->lastInsertId();
             
@@ -60,14 +66,20 @@ class Client {
     /**
      * Update client
      */
-    public static function updateClient($id, $name, $email, $phone = null) {
+    public static function updateClient($id, $name, $email, $phone = null, $pan = null, $gstin = null, $tan = null, $address = null, $client_type = null, $incorporation_date = null) {
         $db = Database::getConnection();
         try {
-            $stmt = $db->prepare("UPDATE clients SET name = :name, email = :email, phone = :phone WHERE id = :id");
+            $stmt = $db->prepare("UPDATE clients SET name = :name, email = :email, phone = :phone, pan = :pan, gstin = :gstin, tan = :tan, address = :address, client_type = :client_type, incorporation_date = :incorporation_date WHERE id = :id");
             $stmt->execute([
                 'name' => $name,
                 'email' => $email,
                 'phone' => $phone,
+                'pan' => empty($pan) ? null : strtoupper(trim($pan)),
+                'gstin' => empty($gstin) ? null : strtoupper(trim($gstin)),
+                'tan' => empty($tan) ? null : strtoupper(trim($tan)),
+                'address' => empty($address) ? null : trim($address),
+                'client_type' => empty($client_type) ? null : trim($client_type),
+                'incorporation_date' => empty($incorporation_date) ? null : $incorporation_date,
                 'id' => $id
             ]);
             

@@ -16,8 +16,14 @@ class ClientController extends BaseController {
                 $name = trim($_POST['name'] ?? '');
                 $email = trim($_POST['email'] ?? '');
                 $phone = trim($_POST['phone'] ?? '');
+                $pan = trim($_POST['pan'] ?? '');
+                $gstin = trim($_POST['gstin'] ?? '');
+                $tan = trim($_POST['tan'] ?? '');
+                $address = trim($_POST['address'] ?? '');
+                $client_type = trim($_POST['client_type'] ?? '');
+                $inc_date = trim($_POST['incorporation_date'] ?? '');
                 if (!empty($name) && !empty($email)) {
-                    $res = Client::createClient($name, $email, $phone);
+                    $res = Client::createClient($name, $email, $phone, $pan, $gstin, $tan, $address, $client_type, $inc_date);
                     if (isset($res['success'])) {
                         Security::logActivity('add_client', "Created client $name");
                         return ["success" => "Client created successfully."];
@@ -32,8 +38,14 @@ class ClientController extends BaseController {
                 $name = trim($_POST['name'] ?? '');
                 $email = trim($_POST['email'] ?? '');
                 $phone = trim($_POST['phone'] ?? '');
+                $pan = trim($_POST['pan'] ?? '');
+                $gstin = trim($_POST['gstin'] ?? '');
+                $tan = trim($_POST['tan'] ?? '');
+                $address = trim($_POST['address'] ?? '');
+                $client_type = trim($_POST['client_type'] ?? '');
+                $inc_date = trim($_POST['incorporation_date'] ?? '');
                 if ($id > 0 && !empty($name) && !empty($email)) {
-                    $res = Client::updateClient($id, $name, $email, $phone);
+                    $res = Client::updateClient($id, $name, $email, $phone, $pan, $gstin, $tan, $address, $client_type, $inc_date);
                     if (isset($res['success'])) {
                         Security::logActivity('edit_client', "Updated client details for ID $id");
                         return ["success" => "Client updated successfully."];

@@ -17,9 +17,12 @@ class ComplianceController extends BaseController {
                 $category = trim($_POST['category'] ?? '');
                 $dueDate = trim($_POST['due_date'] ?? '');
                 $notes = trim($_POST['notes'] ?? '');
+                $fy = trim($_POST['financial_year'] ?? '');
+                $ay = trim($_POST['assessment_year'] ?? '');
+                $period = trim($_POST['periodicity'] ?? '');
 
                 if ($clientId > 0 && !empty($title) && !empty($dueDate)) {
-                    $res = Compliance::createCompliance($clientId, $title, $category, $dueDate, $notes);
+                    $res = Compliance::createCompliance($clientId, $title, $category, $dueDate, $notes, $fy, $ay, $period);
                     if (isset($res['success'])) {
                         Security::logActivity('add_compliance', "Created compliance task '$title' for client ID $clientId");
                         return ["success" => "Compliance task created successfully."];

@@ -1110,6 +1110,34 @@ function isActive($tab, $activeTab) {
                                         <div style="font-weight:600; margin-top:0.15rem;"><?= htmlspecialchars($cObj['phone'] ?: 'N/A') ?></div>
                                     </div>
                                     <div>
+                                        <div style="color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; font-weight:600;">Entity Type</div>
+                                        <div style="font-weight:600; margin-top:0.15rem;"><?= htmlspecialchars($cObj['client_type'] ?: 'N/A') ?></div>
+                                    </div>
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                                        <div>
+                                            <div style="color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; font-weight:600;">PAN Card</div>
+                                            <div style="font-weight:700; color:var(--primary); margin-top:0.15rem;"><?= htmlspecialchars($cObj['pan'] ?: 'N/A') ?></div>
+                                        </div>
+                                        <div>
+                                            <div style="color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; font-weight:600;">GSTIN</div>
+                                            <div style="font-weight:700; color:var(--success); margin-top:0.15rem;"><?= htmlspecialchars($cObj['gstin'] ?: 'N/A') ?></div>
+                                        </div>
+                                    </div>
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                                        <div>
+                                            <div style="color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; font-weight:600;">TAN Number</div>
+                                            <div style="font-weight:600; margin-top:0.15rem;"><?= htmlspecialchars($cObj['tan'] ?: 'N/A') ?></div>
+                                        </div>
+                                        <div>
+                                            <div style="color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; font-weight:600;">Incorp. / DOB</div>
+                                            <div style="font-weight:600; margin-top:0.15rem;"><?= $cObj['incorporation_date'] ? date('d M Y', strtotime($cObj['incorporation_date'])) : 'N/A' ?></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; font-weight:600;">Registered Address</div>
+                                        <div style="font-size:0.85rem; color:var(--text-main); margin-top:0.15rem; line-height:1.4;"><?= nl2br(htmlspecialchars($cObj['address'] ?? 'N/A')) ?></div>
+                                    </div>
+                                    <div>
                                         <div style="color:var(--text-muted); font-size:0.8rem; text-transform:uppercase; font-weight:600;">Secure Portal Link</div>
                                         <?php if ($cObj['portal_token']): ?>
                                             <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.35rem;">
@@ -1772,7 +1800,7 @@ function isActive($tab, $activeTab) {
                                                             <a href="index.php?tab=clients&client_id=<?= $c['id'] ?>&sub=directory" class="btn btn-secondary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;">
                                                                 Open Profile
                                                             </a>
-                                                            <button class="btn btn-secondary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;" onclick="openEditClient(<?= $c['id'] ?>, '<?= addslashes($c['name']) ?>', '<?= addslashes($c['email']) ?>', '<?= addslashes($c['phone']) ?>')">
+                                                            <button class="btn btn-secondary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;" onclick="openEditClient(<?= $c['id'] ?>, '<?= addslashes($c['name']) ?>', '<?= addslashes($c['email']) ?>', '<?= addslashes($c['phone'] ?? '') ?>', '<?= addslashes($c['pan'] ?? '') ?>', '<?= addslashes($c['gstin'] ?? '') ?>', '<?= addslashes($c['tan'] ?? '') ?>', '<?= addslashes($c['address'] ?? '') ?>', '<?= addslashes($c['client_type'] ?? '') ?>', '<?= addslashes($c['incorporation_date'] ?? '') ?>')">
                                                                 Edit
                                                             </button>
                                                             <form action="index.php?tab=clients&sub=directory" method="POST" onsubmit="return confirm('Are you sure?')" style="margin: 0;">
@@ -2041,25 +2069,63 @@ function isActive($tab, $activeTab) {
 
                     <!-- Add Client Modal -->
                     <div class="modal-overlay" id="add-client-modal">
-                        <div class="modal-container">
+                        <div class="modal-container" style="max-width: 550px;">
                             <div class="modal-header">
                                 <h3 style="font-size: 1.15rem; font-weight: 700;">Add Client</h3>
                                 <button class="modal-close" data-close-modal="add-client-modal">&times;</button>
                             </div>
-                            <form action="index.php?tab=clients" method="POST">
+                            <form action="index.php?tab=clients" method="POST" style="display:grid; gap:0.75rem;">
                                 <input type="hidden" name="action" value="add_client">
                                 <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-                                <div class="form-group">
-                                    <label for="c-name" class="form-label">Client / Firm Name</label>
-                                    <input type="text" id="c-name" name="name" class="form-control" required>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                    <div class="form-group">
+                                        <label for="c-name" class="form-label">Client / Firm Name</label>
+                                        <input type="text" id="c-name" name="name" class="form-control" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="c-email" class="form-label">Primary Email</label>
+                                        <input type="email" id="c-email" name="email" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                    <div class="form-group">
+                                        <label for="c-phone" class="form-label">Phone / Contact</label>
+                                        <input type="text" id="c-phone" name="phone" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="c-type" class="form-label">Client Entity Type</label>
+                                        <select id="c-type" name="client_type" class="form-control">
+                                            <option value="Individual">Individual / Proprietorship</option>
+                                            <option value="Partnership">Partnership Firm</option>
+                                            <option value="LLP">Limited Liability Partnership (LLP)</option>
+                                            <option value="Private Limited">Private Limited Company</option>
+                                            <option value="Public Limited">Public Limited Company</option>
+                                            <option value="HUF">HUF</option>
+                                            <option value="Trust">Trust / Society</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.75rem;">
+                                    <div class="form-group">
+                                        <label for="c-pan" class="form-label">PAN Card</label>
+                                        <input type="text" id="c-pan" name="pan" class="form-control" placeholder="ABCDE1234F" pattern="[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}" maxlength="10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="c-gstin" class="form-label">GSTIN</label>
+                                        <input type="text" id="c-gstin" name="gstin" class="form-control" placeholder="27ABCDE1234F1Z5" pattern="[0-9]{2}[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}[0-9a-zA-Z]{3}" maxlength="15">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="c-tan" class="form-label">TAN Number</label>
+                                        <input type="text" id="c-tan" name="tan" class="form-control" placeholder="ABCD12345E" pattern="[a-zA-Z]{4}[0-9]{5}[a-zA-Z]{1}" maxlength="10">
+                                    </div>
                                 </div>
                                 <div class="form-group">
-                                    <label for="c-email" class="form-label">Primary Email</label>
-                                    <input type="email" id="c-email" name="email" class="form-control" required>
+                                    <label for="c-inc-date" class="form-label">Date of Birth / Incorporation</label>
+                                    <input type="date" id="c-inc-date" name="incorporation_date" class="form-control">
                                 </div>
                                 <div class="form-group">
-                                    <label for="c-phone" class="form-label">Phone / Contact</label>
-                                    <input type="text" id="c-phone" name="phone" class="form-control">
+                                    <label for="c-address" class="form-label">Registered Address</label>
+                                    <textarea id="c-address" name="address" class="form-control" rows="2" placeholder="Complete address..."></textarea>
                                 </div>
                                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; padding: 0.75rem;">Create Client</button>
                             </form>
@@ -2068,26 +2134,64 @@ function isActive($tab, $activeTab) {
 
                     <!-- Edit Client Modal -->
                     <div class="modal-overlay" id="edit-client-modal">
-                        <div class="modal-container">
+                        <div class="modal-container" style="max-width: 550px;">
                             <div class="modal-header">
                                 <h3 style="font-size: 1.15rem; font-weight: 700;">Edit Client</h3>
                                 <button class="modal-close" data-close-modal="edit-client-modal">&times;</button>
                             </div>
-                            <form action="index.php?tab=clients" method="POST">
+                            <form action="index.php?tab=clients" method="POST" style="display:grid; gap:0.75rem;">
                                 <input type="hidden" name="action" value="edit_client">
                                 <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                                 <input type="hidden" id="edit-c-id" name="id">
-                                <div class="form-group">
-                                    <label for="edit-c-name" class="form-label">Client Name</label>
-                                    <input type="text" id="edit-c-name" name="name" class="form-control" required>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                    <div class="form-group">
+                                        <label for="edit-c-name" class="form-label">Client Name</label>
+                                        <input type="text" id="edit-c-name" name="name" class="form-control" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edit-c-email" class="form-label">Email</label>
+                                        <input type="email" id="edit-c-email" name="email" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                    <div class="form-group">
+                                        <label for="edit-c-phone" class="form-label">Phone</label>
+                                        <input type="text" id="edit-c-phone" name="phone" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edit-c-type" class="form-label">Client Entity Type</label>
+                                        <select id="edit-c-type" name="client_type" class="form-control">
+                                            <option value="Individual">Individual / Proprietorship</option>
+                                            <option value="Partnership">Partnership Firm</option>
+                                            <option value="LLP">Limited Liability Partnership (LLP)</option>
+                                            <option value="Private Limited">Private Limited Company</option>
+                                            <option value="Public Limited">Public Limited Company</option>
+                                            <option value="HUF">HUF</option>
+                                            <option value="Trust">Trust / Society</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.75rem;">
+                                    <div class="form-group">
+                                        <label for="edit-c-pan" class="form-label">PAN Card</label>
+                                        <input type="text" id="edit-c-pan" name="pan" class="form-control" placeholder="ABCDE1234F" pattern="[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}" maxlength="10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edit-c-gstin" class="form-label">GSTIN</label>
+                                        <input type="text" id="edit-c-gstin" name="gstin" class="form-control" placeholder="27ABCDE1234F1Z5" pattern="[0-9]{2}[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}[0-9a-zA-Z]{3}" maxlength="15">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="edit-c-tan" class="form-label">TAN Number</label>
+                                        <input type="text" id="edit-c-tan" name="tan" class="form-control" placeholder="ABCD12345E" pattern="[a-zA-Z]{4}[0-9]{5}[a-zA-Z]{1}" maxlength="10">
+                                    </div>
                                 </div>
                                 <div class="form-group">
-                                    <label for="edit-c-email" class="form-label">Email</label>
-                                    <input type="email" id="edit-c-email" name="email" class="form-control" required>
+                                    <label for="edit-c-inc-date" class="form-label">Date of Birth / Incorporation</label>
+                                    <input type="date" id="edit-c-inc-date" name="incorporation_date" class="form-control">
                                 </div>
                                 <div class="form-group">
-                                    <label for="edit-c-phone" class="form-label">Phone</label>
-                                    <input type="text" id="edit-c-phone" name="phone" class="form-control">
+                                    <label for="edit-c-address" class="form-label">Registered Address</label>
+                                    <textarea id="edit-c-address" name="address" class="form-control" rows="2" placeholder="Complete address..."></textarea>
                                 </div>
                                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; padding: 0.75rem;">Save Changes</button>
                             </form>
@@ -2095,11 +2199,17 @@ function isActive($tab, $activeTab) {
                     </div>
 
                     <script>
-                        function openEditClient(id, name, email, phone) {
+                        function openEditClient(id, name, email, phone, pan, gstin, tan, address, client_type, incorporation_date) {
                             document.getElementById('edit-c-id').value = id;
                             document.getElementById('edit-c-name').value = name;
                             document.getElementById('edit-c-email').value = email;
                             document.getElementById('edit-c-phone').value = phone;
+                            document.getElementById('edit-c-pan').value = pan || '';
+                            document.getElementById('edit-c-gstin').value = gstin || '';
+                            document.getElementById('edit-c-tan').value = tan || '';
+                            document.getElementById('edit-c-address').value = address || '';
+                            document.getElementById('edit-c-type').value = client_type || 'Individual';
+                            document.getElementById('edit-c-inc-date').value = incorporation_date || '';
                             App.openModal('edit-client-modal');
                         }
                     </script>
@@ -2505,8 +2615,22 @@ function isActive($tab, $activeTab) {
                                     <?php else: ?>
                                         <?php foreach ($taskList as $t): ?>
                                             <tr>
-                                                <td style="font-weight: 700;"><?= htmlspecialchars($t['title']) ?></td>
-                                                <td><?= htmlspecialchars($t['category']) ?></td>
+                                                <td style="font-weight: 700;">
+                                                    <div><?= htmlspecialchars($t['title']) ?></div>
+                                                    <?php if (!empty($t['financial_year']) || !empty($t['periodicity'])): ?>
+                                                        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-top: 0.15rem;">
+                                                            <?= htmlspecialchars($t['financial_year']) ?> <?= !empty($t['assessment_year']) ? '('.htmlspecialchars($t['assessment_year']).')' : '' ?> • <?= htmlspecialchars($t['periodicity']) ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <div><?= htmlspecialchars($t['category']) ?></div>
+                                                    <?php if ($t['estimated_fees'] > 0): ?>
+                                                        <div style="font-size: 0.75rem; color: var(--success); font-weight: 600; margin-top: 0.15rem;">
+                                                            Est: ₹<?= number_format($t['estimated_fees'], 0) ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td><?= htmlspecialchars($t['client_name']) ?></td>
                                                 <td><?= htmlspecialchars($t['staff_name'] ?: 'Unassigned') ?></td>
                                                 <td><?= htmlspecialchars($t['due_date'] ?: 'N/A') ?></td>
@@ -2527,7 +2651,7 @@ function isActive($tab, $activeTab) {
                                                         </button>
                                                         
                                                         <?php if ($isAdmin): ?>
-                                                            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="openEditTask(<?= $t['id'] ?>, <?= $t['client_id'] ?>, <?= intval($t['assigned_to_user_id']) ?>, '<?= addslashes($t['title']) ?>', '<?= addslashes($t['description']) ?>', '<?= $t['status'] ?>', '<?= $t['priority'] ?>', '<?= addslashes($t['category']) ?>', '<?= $t['due_date'] ?>')">
+                                                            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="openEditTask(<?= $t['id'] ?>, <?= $t['client_id'] ?>, <?= intval($t['assigned_to_user_id']) ?>, '<?= addslashes($t['title']) ?>', '<?= addslashes($t['description']) ?>', '<?= $t['status'] ?>', '<?= $t['priority'] ?>', '<?= addslashes($t['category']) ?>', '<?= $t['due_date'] ?>', '<?= addslashes($t['financial_year'] ?? '') ?>', '<?= addslashes($t['assessment_year'] ?? '') ?>', '<?= addslashes($t['periodicity'] ?? '') ?>', '<?= addslashes($t['estimated_fees'] ?? '') ?>')">
                                                                 Edit
                                                             </button>
                                                             <form action="index.php?tab=tasks" method="POST" onsubmit="return confirm('Delete this task?')" style="margin: 0;">
@@ -2711,50 +2835,86 @@ function isActive($tab, $activeTab) {
 
                 <!-- Add Task Modal -->
                 <div class="modal-overlay" id="add-task-modal">
-                    <div class="modal-container">
+                    <div class="modal-container" style="max-width: 550px;">
                         <div class="modal-header">
                             <h3 style="font-size: 1.15rem; font-weight: 700;">Create Task</h3>
                             <button class="modal-close" data-close-modal="add-task-modal">&times;</button>
                         </div>
-                        <form action="index.php?tab=tasks" method="POST">
+                        <form action="index.php?tab=tasks" method="POST" style="display:grid; gap:0.75rem;">
                             <input type="hidden" name="action" value="add_task">
                             <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-                            <div class="form-group">
-                                <label for="t-client" class="form-label">Client / Entity</label>
-                                <select id="t-client" name="client_id" class="form-control" required>
-                                    <option value="">Select client...</option>
-                                    <?php foreach ($clientOptions as $c): ?>
-                                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="t-assigned" class="form-label">Assign To</label>
-                                <select id="t-assigned" name="assigned_to" class="form-control">
-                                    <option value="">Unassigned</option>
-                                    <?php foreach ($staffOptions as $s): ?>
-                                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="t-client" class="form-label">Client / Entity</label>
+                                    <select id="t-client" name="client_id" class="form-control" required>
+                                        <option value="">Select client...</option>
+                                        <?php foreach ($clientOptions as $c): ?>
+                                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="t-assigned" class="form-label">Assign To</label>
+                                    <select id="t-assigned" name="assigned_to" class="form-control">
+                                        <option value="">Unassigned</option>
+                                        <?php foreach ($staffOptions as $s): ?>
+                                            <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="t-title" class="form-label">Task Title</label>
                                 <input type="text" id="t-title" name="title" class="form-control" required placeholder="e.g. GST GSTR-3B Return Filing">
                             </div>
-                             <div class="form-group">
-                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-                                     <label for="t-desc" class="form-label" style="margin:0;">Description / Instructions</label>
-                                     <button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.4rem; display:flex; align-items:center; gap:0.25rem;" onclick="suggestAISubtasks()">
-                                         <i data-lucide="sparkles" style="width:12px; height:12px; color:var(--primary);"></i> AI Checklist
-                                     </button>
-                                 </div>
-                                 <textarea id="t-desc" name="description" class="form-control" rows="3"></textarea>
-                             </div>
                             <div class="form-group">
-                                <label for="t-category" class="form-label">Category</label>
-                                <input type="text" id="t-category" name="category" class="form-control" placeholder="GST, TDS, ROC, Income Tax, Audit" required>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                                    <label for="t-desc" class="form-label" style="margin:0;">Description / Instructions</label>
+                                    <button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:0.15rem 0.4rem; display:flex; align-items:center; gap:0.25rem;" onclick="suggestAISubtasks()">
+                                        <i data-lucide="sparkles" style="width:12px; height:12px; color:var(--primary);"></i> AI Checklist
+                                    </button>
+                                </div>
+                                <textarea id="t-desc" name="description" class="form-control" rows="2"></textarea>
                             </div>
-                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="t-category" class="form-label">Category</label>
+                                    <input type="text" id="t-category" name="category" class="form-control" placeholder="GST, TDS, ROC, Audit" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="t-periodicity" class="form-label">Periodicity</label>
+                                    <select id="t-periodicity" name="periodicity" class="form-control">
+                                        <option value="One-Time" selected>One-Time</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Quarterly">Quarterly</option>
+                                        <option value="Half-Yearly">Half-Yearly</option>
+                                        <option value="Annually">Annually</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="t-fy" class="form-label">Financial Year (FY)</label>
+                                    <select id="t-fy" name="financial_year" class="form-control">
+                                        <option value="">N/A</option>
+                                        <option value="FY 2026-27">FY 2026-27</option>
+                                        <option value="FY 2025-26" selected>FY 2025-26</option>
+                                        <option value="FY 2024-25">FY 2024-25</option>
+                                        <option value="FY 2023-24">FY 2023-24</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="t-ay" class="form-label">Assessment Year (AY)</label>
+                                    <select id="t-ay" name="assessment_year" class="form-control">
+                                        <option value="">N/A</option>
+                                        <option value="AY 2027-28">AY 2027-28</option>
+                                        <option value="AY 2026-27" selected>AY 2026-27</option>
+                                        <option value="AY 2025-26">AY 2025-26</option>
+                                        <option value="AY 2024-25">AY 2024-25</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.75rem;">
                                 <div class="form-group">
                                     <label for="t-priority" class="form-label">Priority</label>
                                     <select id="t-priority" name="priority" class="form-control">
@@ -2767,6 +2927,10 @@ function isActive($tab, $activeTab) {
                                     <label for="t-due" class="form-label">Due Date</label>
                                     <input type="date" id="t-due" name="due_date" class="form-control">
                                 </div>
+                                <div class="form-group">
+                                    <label for="t-fees" class="form-label">Est. Fees (₹)</label>
+                                    <input type="number" id="t-fees" name="estimated_fees" class="form-control" placeholder="5000">
+                                </div>
                             </div>
                             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; padding: 0.75rem;">Create Task</button>
                         </form>
@@ -2775,31 +2939,33 @@ function isActive($tab, $activeTab) {
 
                 <!-- Edit Task Modal -->
                 <div class="modal-overlay" id="edit-task-modal">
-                    <div class="modal-container">
+                    <div class="modal-container" style="max-width: 550px;">
                         <div class="modal-header">
                             <h3 style="font-size: 1.15rem; font-weight: 700;">Edit Task</h3>
                             <button class="modal-close" data-close-modal="edit-task-modal">&times;</button>
                         </div>
-                        <form action="index.php?tab=tasks" method="POST">
+                        <form action="index.php?tab=tasks" method="POST" style="display:grid; gap:0.75rem;">
                             <input type="hidden" name="action" value="edit_task">
                             <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                             <input type="hidden" id="edit-t-id" name="id">
-                            <div class="form-group">
-                                <label for="edit-t-client" class="form-label">Client</label>
-                                <select id="edit-t-client" name="client_id" class="form-control" required>
-                                    <?php foreach ($clientOptions as $c): ?>
-                                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="edit-t-assigned" class="form-label">Assign To</label>
-                                <select id="edit-t-assigned" name="assigned_to" class="form-control">
-                                    <option value="">Unassigned</option>
-                                    <?php foreach ($staffOptions as $s): ?>
-                                        <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="edit-t-client" class="form-label">Client</label>
+                                    <select id="edit-t-client" name="client_id" class="form-control" required>
+                                        <?php foreach ($clientOptions as $c): ?>
+                                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="edit-t-assigned" class="form-label">Assign To</label>
+                                    <select id="edit-t-assigned" name="assigned_to" class="form-control">
+                                        <option value="">Unassigned</option>
+                                        <?php foreach ($staffOptions as $s): ?>
+                                            <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="edit-t-title" class="form-label">Task Title</label>
@@ -2807,21 +2973,55 @@ function isActive($tab, $activeTab) {
                             </div>
                             <div class="form-group">
                                 <label for="edit-t-desc" class="form-label">Description</label>
-                                <textarea id="edit-t-desc" name="description" class="form-control" rows="3"></textarea>
+                                <textarea id="edit-t-desc" name="description" class="form-control" rows="2"></textarea>
                             </div>
-                            <div class="form-group">
-                                <label for="edit-t-status" class="form-label">Status</label>
-                                <select id="edit-t-status" name="status" class="form-control">
-                                    <option value="pending">Pending</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                </select>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="edit-t-status" class="form-label">Status</label>
+                                    <select id="edit-t-status" name="status" class="form-control">
+                                        <option value="pending">Pending</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="edit-t-category" class="form-label">Category</label>
+                                    <input type="text" id="edit-t-category" name="category" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="edit-t-periodicity" class="form-label">Periodicity</label>
+                                    <select id="edit-t-periodicity" name="periodicity" class="form-control">
+                                        <option value="One-Time">One-Time</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Quarterly">Quarterly</option>
+                                        <option value="Half-Yearly">Half-Yearly</option>
+                                        <option value="Annually">Annually</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="edit-t-category" class="form-label">Category</label>
-                                <input type="text" id="edit-t-category" name="category" class="form-control" required>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="edit-t-fy" class="form-label">Financial Year (FY)</label>
+                                    <select id="edit-t-fy" name="financial_year" class="form-control">
+                                        <option value="">N/A</option>
+                                        <option value="FY 2026-27">FY 2026-27</option>
+                                        <option value="FY 2025-26">FY 2025-26</option>
+                                        <option value="FY 2024-25">FY 2024-25</option>
+                                        <option value="FY 2023-24">FY 2023-24</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="edit-t-ay" class="form-label">Assessment Year (AY)</label>
+                                    <select id="edit-t-ay" name="assessment_year" class="form-control">
+                                        <option value="">N/A</option>
+                                        <option value="AY 2027-28">AY 2027-28</option>
+                                        <option value="AY 2026-27">AY 2026-27</option>
+                                        <option value="AY 2025-26">AY 2025-26</option>
+                                        <option value="AY 2024-25">AY 2024-25</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.75rem;">
                                 <div class="form-group">
                                     <label for="edit-t-priority" class="form-label">Priority</label>
                                     <select id="edit-t-priority" name="priority" class="form-control">
@@ -2833,6 +3033,10 @@ function isActive($tab, $activeTab) {
                                 <div class="form-group">
                                     <label for="edit-t-due" class="form-label">Due Date</label>
                                     <input type="date" id="edit-t-due" name="due_date" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="edit-t-fees" class="form-label">Est. Fees (₹)</label>
+                                    <input type="number" id="edit-t-fees" name="estimated_fees" class="form-control">
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; padding: 0.75rem;">Save Changes</button>
@@ -2873,7 +3077,7 @@ function isActive($tab, $activeTab) {
                 </div>
 
                 <script>
-                    function openEditTask(id, client, staff, title, desc, status, priority, category, due) {
+                    function openEditTask(id, client, staff, title, desc, status, priority, category, due, fy, ay, periodicity, fees) {
                         document.getElementById('edit-t-id').value = id;
                         document.getElementById('edit-t-client').value = client;
                         document.getElementById('edit-t-assigned').value = staff;
@@ -2883,6 +3087,10 @@ function isActive($tab, $activeTab) {
                         document.getElementById('edit-t-priority').value = priority;
                         document.getElementById('edit-t-category').value = category;
                         document.getElementById('edit-t-due').value = due;
+                        document.getElementById('edit-t-fy').value = fy || '';
+                        document.getElementById('edit-t-ay').value = ay || '';
+                        document.getElementById('edit-t-periodicity').value = periodicity || 'One-Time';
+                        document.getElementById('edit-t-fees').value = fees || '';
                         App.openModal('edit-task-modal');
                     }
                     function openWorkLog(taskId, taskTitle) {
@@ -2962,7 +3170,12 @@ function isActive($tab, $activeTab) {
                                         <tr>
                                             <td style="font-weight:700;"><?= htmlspecialchars($c['client_name']) ?></td>
                                             <td>
-                                                <?= htmlspecialchars($c['title']) ?>
+                                                <div style="font-weight:700;"><?= htmlspecialchars($c['title']) ?></div>
+                                                <?php if (!empty($c['financial_year']) || !empty($c['periodicity'])): ?>
+                                                    <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-top: 0.15rem;">
+                                                        <?= htmlspecialchars($c['financial_year']) ?> <?= !empty($c['assessment_year']) ? '('.htmlspecialchars($c['assessment_year']).')' : '' ?> • <?= htmlspecialchars($c['periodicity']) ?>
+                                                    </div>
+                                                <?php endif; ?>
                                                 <?php if (!empty($c['client_response'])): ?>
                                                     <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">
                                                         <span style="font-weight:600; color:var(--primary);">Client Response:</span> <?= htmlspecialchars($c['client_response']) ?>
@@ -3078,36 +3291,72 @@ function isActive($tab, $activeTab) {
 
                 <!-- Add Compliance Modal -->
                 <div class="modal-overlay" id="add-compliance-modal">
-                    <div class="modal-container">
+                    <div class="modal-container" style="max-width: 550px;">
                         <div class="modal-header">
                             <h3 style="font-size:1.15rem; font-weight:700;">Add Compliance Task</h3>
                             <button class="modal-close" data-close-modal="add-compliance-modal">&times;</button>
                         </div>
-                        <form action="index.php?tab=compliances" method="POST">
+                        <form action="index.php?tab=compliances" method="POST" style="display:grid; gap:0.75rem;">
                             <input type="hidden" name="action" value="add_compliance">
                             <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-                            <div class="form-group">
-                                <label for="c-comp-client" class="form-label">Client</label>
-                                <select id="c-comp-client" name="client_id" class="form-control" required>
-                                    <option value="">Select client...</option>
-                                    <?php foreach ($clientOptions as $cl): ?>
-                                        <option value="<?= $cl['id'] ?>"><?= htmlspecialchars($cl['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="c-comp-client" class="form-label">Client</label>
+                                    <select id="c-comp-client" name="client_id" class="form-control" required>
+                                        <option value="">Select client...</option>
+                                        <?php foreach ($clientOptions as $cl): ?>
+                                            <option value="<?= $cl['id'] ?>"><?= htmlspecialchars($cl['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="c-comp-title" class="form-label">Compliance Title</label>
+                                    <input type="text" id="c-comp-title" name="title" class="form-control" required placeholder="e.g. GSTR-1 return filing">
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="c-comp-title" class="form-label">Compliance Title</label>
-                                <input type="text" id="c-comp-title" name="title" class="form-control" required placeholder="e.g. GSTR-1 return filing">
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="c-comp-cat" class="form-label">Category</label>
+                                    <select id="c-comp-cat" name="category" class="form-control">
+                                        <option value="GST Return">GST Return</option>
+                                        <option value="TDS Return">TDS Return</option>
+                                        <option value="ITR">Income Tax Return (ITR)</option>
+                                        <option value="ROC">ROC filings</option>
+                                        <option value="Audit">Tax Audit</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="c-comp-periodicity" class="form-label">Periodicity</label>
+                                    <select id="c-comp-periodicity" name="periodicity" class="form-control">
+                                        <option value="One-Time" selected>One-Time</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Quarterly">Quarterly</option>
+                                        <option value="Half-Yearly">Half-Yearly</option>
+                                        <option value="Annually">Annually</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="c-comp-cat" class="form-label">Category</label>
-                                <select id="c-comp-cat" name="category" class="form-control">
-                                    <option value="GST Return">GST Return</option>
-                                    <option value="TDS Return">TDS Return</option>
-                                    <option value="ITR">Income Tax Return (ITR)</option>
-                                    <option value="ROC">ROC filings</option>
-                                    <option value="Audit">Tax Audit</option>
-                                </select>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                                <div class="form-group">
+                                    <label for="c-comp-fy" class="form-label">Financial Year (FY)</label>
+                                    <select id="c-comp-fy" name="financial_year" class="form-control">
+                                        <option value="">N/A</option>
+                                        <option value="FY 2026-27">FY 2026-27</option>
+                                        <option value="FY 2025-26" selected>FY 2025-26</option>
+                                        <option value="FY 2024-25">FY 2024-25</option>
+                                        <option value="FY 2023-24">FY 2023-24</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="c-comp-ay" class="form-label">Assessment Year (AY)</label>
+                                    <select id="c-comp-ay" name="assessment_year" class="form-control">
+                                        <option value="">N/A</option>
+                                        <option value="AY 2027-28">AY 2027-28</option>
+                                        <option value="AY 2026-27" selected>AY 2026-27</option>
+                                        <option value="AY 2025-26">AY 2025-26</option>
+                                        <option value="AY 2024-25">AY 2024-25</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="c-comp-due" class="form-label">Due Date</label>
@@ -3115,7 +3364,7 @@ function isActive($tab, $activeTab) {
                             </div>
                             <div class="form-group">
                                 <label for="c-comp-notes" class="form-label">Notes</label>
-                                <textarea id="c-comp-notes" name="notes" class="form-control" rows="3"></textarea>
+                                <textarea id="c-comp-notes" name="notes" class="form-control" rows="2"></textarea>
                             </div>
                             <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.5rem; padding:0.75rem;">Create Compliance Task</button>
                         </form>
@@ -5110,19 +5359,56 @@ function isActive($tab, $activeTab) {
                                         <label for="inv-num" class="form-label">Invoice Number</label>
                                         <input type="text" id="inv-num" name="invoice_number" class="form-control" required placeholder="e.g. INV-2026-001">
                                     </div>
-                                    <div class="form-group">
-                                        <label for="inv-service" class="form-label">Auto-Fill Service Charge (Optional)</label>
-                                        <select id="inv-service" class="form-control" onchange="if(this.value) { document.getElementById('inv-amt').value = parseFloat(this.value).toFixed(2); calculateGstAndNet(); }">
-                                            <option value="">Select standard service...</option>
-                                            <?php foreach ($servicesList as $srv): ?>
-                                                <option value="<?= htmlspecialchars($srv['charge']) ?>"><?= htmlspecialchars($srv['name']) ?> (₹<?= number_format($srv['charge'], 2) ?>)</option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="inv-amt" class="form-label">Invoiced Base Amount (₹)</label>
-                                        <input type="number" id="inv-amt" name="amount" step="0.01" min="0.01" class="form-control" required placeholder="0.00" oninput="calculateGstAndNet()">
-                                    </div>
+                                    
+                                     <!-- Multiple Services Manager -->
+                                     <div style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1rem;">
+                                         <span class="form-label" style="font-weight:700; display:block; margin-bottom:0.5rem;"><i data-lucide="layers" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--primary);"></i> Invoice Line Items (Multiple Services)</span>
+                                         
+                                         <!-- Dropdown & Add Button -->
+                                         <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+                                             <select id="inv-service-select" class="form-control" style="flex:1;">
+                                                 <option value="">Select standard service...</option>
+                                                 <?php foreach ($servicesList as $srv): ?>
+                                                     <option value="<?= htmlspecialchars($srv['charge']) ?>" data-name="<?= htmlspecialchars($srv['name']) ?>"><?= htmlspecialchars($srv['name']) ?> (₹<?= number_format($srv['charge'], 0) ?>)</option>
+                                                 <?php endforeach; ?>
+                                             </select>
+                                             <button type="button" class="btn btn-secondary" onclick="addServiceToInvoice()" style="padding:0.5rem 0.75rem; font-size:0.8rem; font-weight:600;">
+                                                 + Add
+                                             </button>
+                                         </div>
+
+                                         <!-- Custom Item input -->
+                                         <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+                                             <input type="text" id="inv-custom-name" class="form-control" style="flex:2; font-size:0.8rem;" placeholder="Or type custom service...">
+                                             <input type="number" id="inv-custom-charge" class="form-control" style="flex:1; font-size:0.8rem;" placeholder="Amount (₹)">
+                                             <button type="button" class="btn btn-secondary" onclick="addCustomServiceToInvoice()" style="padding:0.5rem 0.75rem; font-size:0.8rem; font-weight:600;">
+                                                 + Custom
+                                             </button>
+                                         </div>
+
+                                         <!-- Selected Items Table -->
+                                         <div style="max-height: 150px; overflow-y:auto; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.15);">
+                                             <table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
+                                                 <thead>
+                                                     <tr style="border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+                                                         <th style="padding:0.4rem;">Service</th>
+                                                         <th style="padding:0.4rem; text-align:right;">Charge</th>
+                                                         <th style="padding:0.4rem; text-align:center; width:40px;">Action</th>
+                                                     </tr>
+                                                 </thead>
+                                                 <tbody id="invoice-items-body">
+                                                     <tr>
+                                                         <td colspan="3" style="padding:0.5rem; text-align:center; color:var(--text-muted); font-style:italic;">No services added yet.</td>
+                                                     </tr>
+                                                 </tbody>
+                                             </table>
+                                         </div>
+                                     </div>
+
+                                     <div class="form-group">
+                                         <label for="inv-amt" class="form-label">Invoiced Base Amount (Subtotal) (₹)</label>
+                                         <input type="number" id="inv-amt" name="amount" step="0.01" min="0.01" class="form-control" required placeholder="0.00" readonly style="background-color: var(--bg-card); font-weight: 700;">
+                                     </div>
 
                                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem; background:var(--bg-input); padding:0.75rem; border-radius:var(--radius-md); margin-bottom:1rem; box-shadow: var(--clay-shadow-input);">
                                         <div class="form-group" style="margin-bottom:0.5rem;">
@@ -5197,6 +5483,87 @@ function isActive($tab, $activeTab) {
                 </div>
 
                 <script>
+                    let invoiceServices = [];
+
+                    function addServiceToInvoice() {
+                        const select = document.getElementById('inv-service-select');
+                        const selectedOption = select.options[select.selectedIndex];
+                        if (!select.value) return;
+
+                        const name = selectedOption.getAttribute('data-name');
+                        const charge = parseFloat(select.value);
+
+                        invoiceServices.push({ name, charge });
+                        renderInvoiceServices();
+                        select.value = '';
+                    }
+
+                    function addCustomServiceToInvoice() {
+                        const nameInput = document.getElementById('inv-custom-name');
+                        const chargeInput = document.getElementById('inv-custom-charge');
+                        const name = nameInput.value.trim();
+                        const charge = parseFloat(chargeInput.value);
+
+                        if (!name || isNaN(charge) || charge <= 0) {
+                            alert("Please enter a valid service name and positive amount.");
+                            return;
+                        }
+
+                        invoiceServices.push({ name, charge });
+                        renderInvoiceServices();
+                        nameInput.value = '';
+                        chargeInput.value = '';
+                    }
+
+                    function removeInvoiceService(index) {
+                        invoiceServices.splice(index, 1);
+                        renderInvoiceServices();
+                    }
+
+                    function renderInvoiceServices() {
+                        const tbody = document.getElementById('invoice-items-body');
+                        const amtInput = document.getElementById('inv-amt');
+                        const descInput = document.getElementById('inv-desc');
+
+                        if (invoiceServices.length === 0) {
+                            tbody.innerHTML = `<tr><td colspan="3" style="padding:0.5rem; text-align:center; color:var(--text-muted); font-style:italic;">No services added yet.</td></tr>`;
+                            amtInput.value = '';
+                            descInput.value = '';
+                            calculateGstAndNet();
+                            return;
+                        }
+
+                        let html = '';
+                        let subtotal = 0;
+                        let desc = '';
+
+                        invoiceServices.forEach((item, index) => {
+                            subtotal += item.charge;
+                            desc += (desc ? "\n" : "") + `${item.name}: ₹${item.charge.toFixed(2)}`;
+                            html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                <td style="padding:0.4rem; color:var(--text-main); font-weight:600;">${item.name}</td>
+                                <td style="padding:0.4rem; text-align:right; font-weight:700; color:var(--primary);">₹${item.charge.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                                <td style="padding:0.4rem; text-align:center;">
+                                    <button type="button" class="btn btn-danger" style="padding:0.15rem 0.35rem; font-size:0.75rem;" onclick="removeInvoiceService(${index})">&times;</button>
+                                </td>
+                            </tr>`;
+                        });
+
+                        tbody.innerHTML = html;
+                        amtInput.value = subtotal.toFixed(2);
+                        descInput.value = desc;
+                        calculateGstAndNet();
+                    }
+
+                    // Reset invoice items array on modal open
+                    document.addEventListener('click', function(e) {
+                        const openBtn = e.target.closest('[data-open-modal="add-invoice-modal"]');
+                        if (openBtn) {
+                            invoiceServices = [];
+                            renderInvoiceServices();
+                        }
+                    });
+
                     function calculateGstAndNet() {
                         const baseAmt = parseFloat(document.getElementById('inv-amt').value) || 0.0;
                         const gstType = document.getElementById('inv-gst-type').value;

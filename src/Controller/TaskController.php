@@ -19,8 +19,12 @@ class TaskController extends BaseController {
                 $priority = trim($_POST['priority'] ?? 'medium');
                 $category = trim($_POST['category'] ?? '');
                 $dueDate = trim($_POST['due_date'] ?? '');
+                $fy = trim($_POST['financial_year'] ?? '');
+                $ay = trim($_POST['assessment_year'] ?? '');
+                $period = trim($_POST['periodicity'] ?? '');
+                $fees = $_POST['estimated_fees'] !== '' ? floatval($_POST['estimated_fees']) : null;
                 if ($clientId > 0 && !empty($title) && !empty($category)) {
-                    $res = Task::createTask($clientId, $assignedTo, $title, $description, $priority, $category, $dueDate);
+                    $res = Task::createTask($clientId, $assignedTo, $title, $description, $priority, $category, $dueDate, $fy, $ay, $period, $fees);
                     if (isset($res['success'])) {
                         Security::logActivity('add_task', "Created task: $title");
                         return ["success" => "Task created successfully."];
@@ -40,8 +44,12 @@ class TaskController extends BaseController {
                 $priority = trim($_POST['priority'] ?? 'medium');
                 $category = trim($_POST['category'] ?? '');
                 $dueDate = trim($_POST['due_date'] ?? '');
+                $fy = trim($_POST['financial_year'] ?? '');
+                $ay = trim($_POST['assessment_year'] ?? '');
+                $period = trim($_POST['periodicity'] ?? '');
+                $fees = $_POST['estimated_fees'] !== '' ? floatval($_POST['estimated_fees']) : null;
                 if ($id > 0 && $clientId > 0 && !empty($title) && !empty($category)) {
-                    $res = Task::updateTask($id, $clientId, $assignedTo, $title, $description, $status, $priority, $category, $dueDate);
+                    $res = Task::updateTask($id, $clientId, $assignedTo, $title, $description, $status, $priority, $category, $dueDate, $fy, $ay, $period, $fees);
                     if (isset($res['success'])) {
                         Security::logActivity('edit_task', "Updated task ID $id");
                         return ["success" => "Task updated successfully."];

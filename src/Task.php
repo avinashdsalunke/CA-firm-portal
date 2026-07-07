@@ -71,12 +71,12 @@ class Task {
     /**
      * Create a task
      */
-    public static function createTask($clientId, $assignedTo, $title, $description, $priority, $category, $dueDate) {
+    public static function createTask($clientId, $assignedTo, $title, $description, $priority, $category, $dueDate, $financial_year = null, $assessment_year = null, $periodicity = null, $estimated_fees = null) {
         $db = Database::getConnection();
         try {
             $stmt = $db->prepare("
-                INSERT INTO tasks (client_id, assigned_to_user_id, title, description, priority, category, due_date, status) 
-                VALUES (:client_id, :assigned_to_user_id, :title, :description, :priority, :category, :due_date, 'pending')
+                INSERT INTO tasks (client_id, assigned_to_user_id, title, description, priority, category, due_date, status, financial_year, assessment_year, periodicity, estimated_fees) 
+                VALUES (:client_id, :assigned_to_user_id, :title, :description, :priority, :category, :due_date, 'pending', :financial_year, :assessment_year, :periodicity, :estimated_fees)
             ");
             $stmt->execute([
                 'client_id' => $clientId,
@@ -85,7 +85,11 @@ class Task {
                 'description' => $description,
                 'priority' => $priority,
                 'category' => $category,
-                'due_date' => $dueDate ?: null
+                'due_date' => $dueDate ?: null,
+                'financial_year' => $financial_year ?: null,
+                'assessment_year' => $assessment_year ?: null,
+                'periodicity' => $periodicity ?: null,
+                'estimated_fees' => $estimated_fees !== null ? floatval($estimated_fees) : null
             ]);
             $taskId = $db->lastInsertId();
 
@@ -99,13 +103,14 @@ class Task {
     /**
      * Update a task
      */
-    public static function updateTask($id, $clientId, $assignedTo, $title, $description, $status, $priority, $category, $dueDate) {
+    public static function updateTask($id, $clientId, $assignedTo, $title, $description, $status, $priority, $category, $dueDate, $financial_year = null, $assessment_year = null, $periodicity = null, $estimated_fees = null) {
         $db = Database::getConnection();
         try {
             $stmt = $db->prepare("
                 UPDATE tasks 
                 SET client_id = :client_id, assigned_to_user_id = :assigned_to_user_id, title = :title, 
-                    description = :description, status = :status, priority = :priority, category = :category, due_date = :due_date 
+                    description = :description, status = :status, priority = :priority, category = :category, due_date = :due_date,
+                    financial_year = :financial_year, assessment_year = :assessment_year, periodicity = :periodicity, estimated_fees = :estimated_fees
                 WHERE id = :id
             ");
             $stmt->execute([
@@ -117,6 +122,10 @@ class Task {
                 'priority' => $priority,
                 'category' => $category,
                 'due_date' => $dueDate ?: null,
+                'financial_year' => $financial_year ?: null,
+                'assessment_year' => $assessment_year ?: null,
+                'periodicity' => $periodicity ?: null,
+                'estimated_fees' => $estimated_fees !== null ? floatval($estimated_fees) : null,
                 'id' => $id
             ]);
 
@@ -335,7 +344,7 @@ class Task {
         
         $clients = $db->query("SELECT COUNT(*) FROM clients")->fetchColumn();
         $staff = $db->query("SELECT COUNT(*) FROM users WHERE role = 'staff'")->fetchColumn();
-        $tasks = $db->query("SELECT COUNT(*) FROM tasks")->fetchColumn();
+        $tasks = $db->query("SELECT COUNT(*) FROM tasks WHERE status != 'completed'")->fetchColumn();
         
         $overdue = $db->query("SELECT COUNT(*) FROM tasks WHERE due_date < CURRENT_DATE() AND status != 'completed'")->fetchColumn();
         $dueToday = $db->query("SELECT COUNT(*) FROM tasks WHERE due_date = CURRENT_DATE() AND status != 'completed'")->fetchColumn();

@@ -58,19 +58,22 @@ class Compliance {
     /**
      * Create compliance task
      */
-    public static function createCompliance($clientId, $title, $category, $dueDate, $notes = null) {
+    public static function createCompliance($clientId, $title, $category, $dueDate, $notes = null, $financial_year = null, $assessment_year = null, $periodicity = null) {
         $db = Database::getConnection();
         try {
             $stmt = $db->prepare("
-                INSERT INTO compliances (client_id, title, category, due_date, status, notes) 
-                VALUES (:client_id, :title, :category, :due_date, 'pending', :notes)
+                INSERT INTO compliances (client_id, title, category, due_date, status, notes, financial_year, assessment_year, periodicity) 
+                VALUES (:client_id, :title, :category, :due_date, 'pending', :notes, :financial_year, :assessment_year, :periodicity)
             ");
             $stmt->execute([
                 'client_id' => $clientId,
                 'title' => $title,
                 'category' => $category,
                 'due_date' => $dueDate,
-                'notes' => $notes
+                'notes' => $notes,
+                'financial_year' => $financial_year ?: null,
+                'assessment_year' => $assessment_year ?: null,
+                'periodicity' => $periodicity ?: null
             ]);
             $complianceId = $db->lastInsertId();
 
