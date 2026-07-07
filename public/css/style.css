@@ -2,25 +2,25 @@
 
 /* Core variables representing the Claymorphism design system */
 :root {
-    --bg-base: #121216;
-    --bg-surface: #1e1e24;
-    --bg-card: #25252f;
-    --bg-input: #1a1a20;
+    --bg-base: #0f111a;
+    --bg-surface: #161925;
+    --bg-card: #1f2336;
+    --bg-input: #111420;
     
-    --text-main: #f5f5f7;
-    --text-muted: #a0a0b0;
-    --text-inverse: #121216;
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-inverse: #0f111a;
     
-    --primary: #6366f1;
-    --primary-glow: rgba(99, 102, 241, 0.4);
-    --primary-hover: #4f46e5;
+    --primary: #38bdf8; /* Vibrant Sky Blue */
+    --primary-glow: rgba(56, 189, 248, 0.4);
+    --primary-hover: #0284c7;
     
-    --success: #10b981;
-    --success-glow: rgba(16, 185, 129, 0.2);
-    --warning: #f59e0b;
-    --warning-glow: rgba(245, 158, 11, 0.2);
-    --danger: #ef4444;
-    --danger-glow: rgba(239, 68, 68, 0.2);
+    --success: #34d399; /* Emerald Green */
+    --success-glow: rgba(52, 211, 153, 0.2);
+    --warning: #fb923c; /* Orange */
+    --warning-glow: rgba(251, 146, 60, 0.2);
+    --danger: #f87171; /* Coral Red */
+    --danger-glow: rgba(248, 113, 113, 0.2);
 
     /* Claymorphism Dual Shadows: Top-Left soft highlight, Bottom-Right deep shadow */
     --clay-shadow-flat: 
@@ -41,7 +41,7 @@
     --clay-shadow-button-hover: 
         inset 3px 3px 6px rgba(255, 255, 255, 0.25),
         inset -3px -3px 6px rgba(0, 0, 0, 0.6),
-        4px 4px 12px rgba(99, 102, 241, 0.4);
+        4px 4px 12px rgba(56, 189, 248, 0.4);
 
     --clay-shadow-input: 
         inset 2px 2px 5px rgba(0, 0, 0, 0.5),
@@ -53,6 +53,53 @@
     --radius-sm: 0.5rem;
     
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.light-mode {
+    --bg-base: #f4f6f9;
+    --bg-surface: #ffffff;
+    --bg-card: #ffffff;
+    --bg-input: #f8fafc;
+    
+    --text-main: #0B2B5C; /* Deep Navy Blue */
+    --text-muted: #64748b; /* Slate Gray */
+    --text-inverse: #ffffff;
+    
+    --primary: #0B2B5C; /* Deep Navy Blue */
+    --primary-glow: rgba(11, 43, 92, 0.15);
+    --primary-hover: #A22D30; /* Crimson Red */
+    
+    --success: #2C8A4A; /* Forest Green */
+    --success-glow: rgba(44, 138, 74, 0.2);
+    --warning: #e25e3e;
+    --warning-glow: rgba(226, 94, 62, 0.2);
+    --danger: #A22D30; /* Crimson Red */
+    --danger-glow: rgba(162, 45, 48, 0.2);
+    
+    --clay-shadow-flat: 
+        inset 2px 2px 5px rgba(255, 255, 255, 0.8),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.05),
+        2px 4px 10px rgba(0, 0, 0, 0.06);
+        
+    --clay-shadow-card: 
+        inset 3px 3px 6px rgba(255, 255, 255, 0.9),
+        inset -3px -3px 6px rgba(0, 0, 0, 0.08),
+        0 10px 25px rgba(0, 0, 0, 0.04);
+        
+    --clay-shadow-button: 
+        inset 2px 2px 4px rgba(255, 255, 255, 0.5),
+        inset -2px -2px 4px rgba(0, 0, 0, 0.15),
+        2px 2px 5px rgba(0, 0, 0, 0.1);
+        
+    --clay-shadow-button-hover: 
+        inset 3px 3px 6px rgba(255, 255, 255, 0.6),
+        inset -3px -3px 6px rgba(0, 0, 0, 0.2),
+        3px 3px 8px rgba(11, 43, 92, 0.25);
+        
+    --clay-shadow-input: 
+        inset 1px 1px 3px rgba(0, 0, 0, 0.08),
+        inset -1px -1px 3px rgba(255, 255, 255, 0.8),
+        0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 /* Base Styles */

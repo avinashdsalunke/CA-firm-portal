@@ -427,11 +427,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const moonIcon = document.getElementById('theme-moon-icon');
 
     // Retrieve active theme
-    const currentTheme = localStorage.getItem('theme') || 'dark';
+    const currentTheme = localStorage.getItem('theme') || 'light';
     if (currentTheme === 'light') {
         document.body.classList.add('light-mode');
         if (sunIcon) sunIcon.style.display = 'none';
         if (moonIcon) moonIcon.style.display = 'block';
+    } else {
+        document.body.classList.remove('light-mode');
+        if (sunIcon) sunIcon.style.display = 'block';
+        if (moonIcon) moonIcon.style.display = 'none';
     }
 
     if (themeBtn) {
