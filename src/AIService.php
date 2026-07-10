@@ -1,11 +1,74 @@
 <?php
 // src/AIService.php
 
+require_once __DIR__ . '/Util.php';
+
 class AIService {
+    /**
+     * Call Google Gemini API
+     */
+    private static function callGeminiAPI($prompt, $systemInstruction = null) {
+        $apiKey = Util::getEnv('GEMINI_API_KEY');
+        if (empty($apiKey)) {
+            return null;
+        }
+
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . urlencode($apiKey);
+
+        if ($systemInstruction) {
+            $prompt = "System Instruction: " . $systemInstruction . "\n\nUser Request: " . $prompt;
+        }
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => $prompt]
+                    ]
+                ]
+            ],
+            'generationConfig' => [
+                'temperature' => 0.3,
+                'maxOutputTokens' => 1024,
+            ]
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        
+        $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            curl_close($ch);
+            return null;
+        }
+        curl_close($ch);
+
+        $data = json_decode($response, true);
+        if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+            return trim($data['candidates'][0]['content']['parts'][0]['text']);
+        }
+
+        return null;
+    }
+
     /**
      * Parse User Chat Prompts
      */
     public static function chatResponse($prompt) {
+        $apiKey = Util::getEnv('GEMINI_API_KEY');
+        if (!empty($apiKey)) {
+            $systemInstruction = "You are a certified Chartered Accountant (CA) firm assistant. Answer user queries professionally and concisely in English. Help with Income Tax, GST, Audits, Compliances, and system settings.";
+            $response = self::callGeminiAPI($prompt, $systemInstruction);
+            if ($response) {
+                return $response;
+            }
+        }
+
         $p = strtolower(trim($prompt));
 
         if (strpos($p, 'due date') !== false || strpos($p, 'compliance') !== false || strpos($p, 'gstr') !== false) {
@@ -42,6 +105,15 @@ class AIService {
      * Suggest checklists for common tasks
      */
     public static function suggestSubtasks($taskTitle) {
+        $apiKey = Util::getEnv('GEMINI_API_KEY');
+        if (!empty($apiKey)) {
+            $prompt = "For the Chartered Accountant (CA) firm CRM task titled \"$taskTitle\", generate a list of 3 to 5 clear, professional subtasks/checklists. Return the result format strictly as markdown bullet points starting with - [ ], one per line. Do not write any introduction or conclusion.";
+            $response = self::callGeminiAPI($prompt, "You are a professional Chartered Accountant project manager.");
+            if ($response) {
+                return $response;
+            }
+        }
+
         $t = strtolower($taskTitle);
         if (strpos($t, 'audit') !== false) {
             return "- [ ] Fetch bank statements and ledgers\n- [ ] Reconcile cash and purchase transactions\n- [ ] Verify fixed asset purchases\n- [ ] Prepare draft Balance Sheet and P&L statements";
@@ -105,5 +177,98 @@ class AIService {
         ];
 
         return $insights;
+    }
+
+    /**
+     * Parse document files using Gemini API
+     */
+    public static function parseUploadedDocument($filePath, $mimeType) {
+        $apiKey = Util::getEnv('GEMINI_API_KEY');
+        if (empty($apiKey)) {
+            return [
+                'success' => false,
+                'message' => 'Gemini API key is not configured.'
+            ];
+        }
+
+        if (!file_exists($filePath)) {
+            return [
+                'success' => false,
+                'message' => 'File not found.'
+            ];
+        }
+
+        $fileData = base64_encode(file_get_contents($filePath));
+        
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . urlencode($apiKey);
+
+        $prompt = "You are a professional Chartered Accountant (CA) Document Parser. Analyze this document and extract the following details in raw JSON format. Return ONLY the JSON object. Do not include markdown code block backticks (like ```json).
+Fields to extract:
+- DocumentType: String (e.g. GST Invoice, Form 16, Bank Statement, PAN Card, Other)
+- TaxpayerName: String
+- PAN: String (format ABCDE1234F, leave null if not found)
+- GSTIN: String (15-character format, leave null if not found)
+- TotalAmount: Float/Double (leave null if not found)
+- FinancialYear: String (e.g. 2025-26, leave null if not found)
+- VerificationStatus: String ('Valid' if document looks genuine and not modified, else 'Suspect')
+- Warnings: Array of Strings (list any discrepancies, e.g. dates not matching, missing signature, arithmetic errors)";
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        [
+                            'inlineData' => [
+                                'mimeType' => $mimeType,
+                                'data' => $fileData
+                            ]
+                        ],
+                        [
+                            'text' => $prompt
+                        ]
+                    ]
+                ]
+            ],
+            'generationConfig' => [
+                'temperature' => 0.1,
+                'responseMimeType' => 'application/json'
+            ]
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        
+        $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            return [
+                'success' => false,
+                'message' => 'Curl error: ' . $err
+            ];
+        }
+        curl_close($ch);
+
+        $data = json_decode($response, true);
+        if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+            $text = trim($data['candidates'][0]['content']['parts'][0]['text']);
+            $jsonData = json_decode($text, true);
+            if ($jsonData) {
+                return [
+                    'success' => true,
+                    'data' => $jsonData
+                ];
+            }
+        }
+
+        return [
+            'success' => false,
+            'message' => 'AI could not read or structure the document.'
+        ];
     }
 }

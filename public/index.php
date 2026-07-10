@@ -17,6 +17,7 @@ require_once __DIR__ . '/../src/AIService.php';
 require_once __DIR__ . '/../src/CRM.php';
 require_once __DIR__ . '/../src/Report.php';
 require_once __DIR__ . '/../src/Tenant.php';
+require_once __DIR__ . '/../src/OfficeSuite.php';
 
 // Controllers
 require_once __DIR__ . '/../src/Controller/ClientController.php';
@@ -114,6 +115,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'ai_query') {
         $rawData = $_POST['data'] ?? '{}';
         $reportData = json_decode($rawData, true);
         echo json_encode(['summary' => AIService::summarizeReport($reportData)]);
+    } elseif ($type === 'parse_doc') {
+        $filePath = $_GET['file_path'] ?? '';
+        $mimeType = $_GET['mime_type'] ?? '';
+        $realBase = realpath(__DIR__ . '/uploads');
+        $realTarget = realpath($filePath);
+        if ($realTarget && strpos($realTarget, $realBase) === 0 && file_exists($realTarget)) {
+            $parseResult = AIService::parseUploadedDocument($realTarget, $mimeType);
+            echo json_encode($parseResult);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Invalid file path or file not found.']);
+        }
     }
     exit;
 }
@@ -199,7 +211,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $res = ["error" => "Unauthorized access."];
                 }
             }
-        } elseif ($action === 'register_tenant') {
+            } elseif ($action === 'add_dsc') {
+                $cId = intval($_POST['client_id'] ?? 0);
+                $dName = trim($_POST['director_name'] ?? '');
+                $expDate = trim($_POST['expiry_date'] ?? '');
+                $pwd = trim($_POST['password_hint'] ?? '');
+                $pin = trim($_POST['pin_hint'] ?? '');
+                if ($cId > 0 && !empty($dName) && !empty($expDate)) {
+                    $res = OfficeSuite::addDSCToken($cId, $dName, $expDate, $pwd, $pin);
+                } else {
+                    $res = ["error" => "Client, Director Name and Expiry Date are required."];
+                }
+            } elseif ($action === 'delete_dsc') {
+                $id = intval($_POST['id'] ?? 0);
+                $res = OfficeSuite::deleteDSCToken($id);
+            } elseif ($action === 'add_expiry') {
+                $cId = intval($_POST['client_id'] ?? 0);
+                $docType = trim($_POST['doc_type'] ?? '');
+                $expDate = trim($_POST['expiry_date'] ?? '');
+                if ($cId > 0 && !empty($docType) && !empty($expDate)) {
+                    $res = OfficeSuite::addDocumentExpiry($cId, $docType, $expDate);
+                } else {
+                    $res = ["error" => "Client, Document Type and Expiry Date are required."];
+                }
+            } elseif ($action === 'delete_expiry') {
+                $id = intval($_POST['id'] ?? 0);
+                $res = OfficeSuite::deleteDocumentExpiry($id);
+            } elseif ($action === 'add_timesheet') {
+                $cId = intval($_POST['client_id'] ?? 0);
+                $hours = floatval($_POST['hours'] ?? 0);
+                $desc = trim($_POST['description'] ?? '');
+                $dateLogged = trim($_POST['date_logged'] ?? date('Y-m-d'));
+                if ($cId > 0 && $hours > 0 && !empty($desc)) {
+                    $res = OfficeSuite::addTimesheet($user['id'], $cId, $hours, $desc, $dateLogged);
+                } else {
+                    $res = ["error" => "Client, Hours, and Description are required."];
+                }
+            } elseif ($action === 'delete_timesheet') {
+                $id = intval($_POST['id'] ?? 0);
+                $res = OfficeSuite::deleteTimesheet($id);
+            } elseif ($action === 'bill_timesheet') {
+                if ($isAdmin) {
+                    $tsId = intval($_POST['id'] ?? 0);
+                    $rate = floatval($_POST['hourly_rate'] ?? 500);
+                    $db = Database::getConnection();
+                    $stmt = $db->prepare("SELECT * FROM timesheets WHERE id = :id LIMIT 1");
+                    $stmt->execute(['id' => $tsId]);
+                    $ts = $stmt->fetch();
+                    if ($ts && $ts['billed_status'] === 'pending') {
+                        $amount = $ts['hours'] * $rate;
+                        $invoiceNum = 'INV-TS-' . time();
+                        $issueDate = date('Y-m-d');
+                        $dueDate = date('Y-m-d', strtotime('+7 days'));
+                        $invDesc = "Billing for logged timesheet hours: " . $ts['description'] . " (" . $ts['hours'] . " hours @ ₹" . $rate . "/hr)";
+                        $invRes = Accounting::createInvoice($ts['client_id'], $invoiceNum, $amount, $issueDate, $dueDate, $invDesc);
+                        if (isset($invRes['success'])) {
+                            $stmtInv = $db->prepare("SELECT id FROM accounting_invoices WHERE invoice_number = :inv LIMIT 1");
+                            $stmtInv->execute(['inv' => $invoiceNum]);
+                            $inv = $stmtInv->fetch();
+                            if ($inv) {
+                                OfficeSuite::billTimesheet($tsId, $inv['id']);
+                                $res = ["success" => "Timesheet billed successfully. Invoice generated: " . $invoiceNum];
+                            } else {
+                                $res = ["error" => "Invoice generated but failed to fetch invoice ID."];
+                            }
+                        } else {
+                            $res = ["error" => "Failed to create invoice."];
+                        }
+                    } else {
+                        $res = ["error" => "Timesheet not found or already billed."];
+                    }
+                } else {
+                    $res = ["error" => "Unauthorized access."];
+                }
+            } elseif ($action === 'add_tax_computation') {
+                $cId = intval($_POST['client_id'] ?? 0);
+                $fy = trim($_POST['financial_year'] ?? '');
+                $grossSalary = floatval($_POST['gross_salary'] ?? 0);
+                $houseProperty = floatval($_POST['house_property'] ?? 0);
+                $capGains = floatval($_POST['cap_gains'] ?? 0);
+                $businessIncome = floatval($_POST['business_income'] ?? 0);
+                $otherSources = floatval($_POST['other_sources'] ?? 0);
+                $deductionsOld = floatval($_POST['deductions_old'] ?? 0);
+                
+                $taxData = OfficeSuite::calculateTaxRegimes($grossSalary, $houseProperty, $capGains, $businessIncome, $otherSources, $deductionsOld);
+                
+                if ($cId > 0 && !empty($fy)) {
+                    $res = OfficeSuite::addTaxComputation(
+                        $cId, $fy, $grossSalary, $houseProperty, $capGains, $businessIncome, $otherSources, $deductionsOld,
+                        $taxData['tax_old'], $taxData['tax_new'], $taxData['suggested']
+                    );
+                } else {
+                    $res = ["error" => "Client and Financial Year are required."];
+                }
+            } elseif ($action === 'delete_tax_computation') {
+                $id = intval($_POST['id'] ?? 0);
+                $res = OfficeSuite::deleteTaxComputation($id);
+            } elseif ($action === 'register_tenant') {
             if ($user['role'] === 'super_admin') {
                 $res = Tenant::createTenant($_POST['tenant_name'] ?? '', $_POST['plan_name'] ?? 'basic');
             } else {
@@ -258,7 +366,7 @@ function isActive($tab, $activeTab) {
             </div>
             
             <ul class="sidebar-menu">
-                <li class="sidebar-item <?= isActive('dashboard', $activeTab) ?>">
+                <li class="sidebar-item item-dashboard <?= isActive('dashboard', $activeTab) ?>">
                     <a href="index.php?tab=dashboard">
                         <i data-lucide="layout-dashboard"></i>
                         <span>Dashboard</span>
@@ -266,7 +374,7 @@ function isActive($tab, $activeTab) {
                 </li>
                 
                 <?php if (RBAC::hasPermission($user['role'], 'manage_clients')): ?>
-                    <li class="sidebar-item <?= isActive('clients', $activeTab) ?>">
+                    <li class="sidebar-item item-clients <?= isActive('clients', $activeTab) ?>">
                         <a href="index.php?tab=clients">
                             <i data-lucide="users"></i>
                             <span>Client CRM</span>
@@ -275,7 +383,7 @@ function isActive($tab, $activeTab) {
                 <?php endif; ?>
                 
                 <?php if (RBAC::hasPermission($user['role'], 'manage_staff')): ?>
-                    <li class="sidebar-item <?= isActive('staff', $activeTab) ?>">
+                    <li class="sidebar-item item-staff <?= isActive('staff', $activeTab) ?>">
                         <a href="index.php?tab=staff">
                             <i data-lucide="user-cog"></i>
                             <span>Employee Mgmt</span>
@@ -283,28 +391,28 @@ function isActive($tab, $activeTab) {
                     </li>
                 <?php endif; ?>
                 
-                <li class="sidebar-item <?= isActive('tasks', $activeTab) ?>">
+                <li class="sidebar-item item-tasks <?= isActive('tasks', $activeTab) ?>">
                     <a href="index.php?tab=tasks">
                         <i data-lucide="clipboard-list"></i>
                         <span>Task Board</span>
                     </a>
                 </li>
                 
-                <li class="sidebar-item <?= isActive('compliances', $activeTab) ?>">
+                <li class="sidebar-item item-compliances <?= isActive('compliances', $activeTab) ?>">
                     <a href="index.php?tab=compliances">
                         <i data-lucide="award"></i>
                         <span>Compliance Tracker</span>
                     </a>
                 </li>
 
-                <li class="sidebar-item <?= isActive('hrms', $activeTab) ?>">
+                <li class="sidebar-item item-hrms <?= isActive('hrms', $activeTab) ?>">
                     <a href="index.php?tab=hrms">
                         <i data-lucide="contact-2"></i>
                         <span>HRMS Portal</span>
                     </a>
                 </li>
 
-                <li class="sidebar-item <?= isActive('chat', $activeTab) ?>">
+                <li class="sidebar-item item-chat <?= isActive('chat', $activeTab) ?>">
                     <a href="index.php?tab=chat">
                         <i data-lucide="message-square"></i>
                         <span>Communication</span>
@@ -312,13 +420,13 @@ function isActive($tab, $activeTab) {
                 </li>
 
                 <?php if (RBAC::hasPermission($user['role'], 'manage_accounting')): ?>
-                    <li class="sidebar-item <?= isActive('accounting', $activeTab) ?>">
+                    <li class="sidebar-item item-accounting <?= isActive('accounting', $activeTab) ?>">
                         <a href="index.php?tab=accounting">
                             <i data-lucide="indian-rupee"></i>
                             <span>Accounting</span>
                         </a>
                     </li>
-                    <li class="sidebar-item <?= isActive('services', $activeTab) ?>">
+                    <li class="sidebar-item item-services <?= isActive('services', $activeTab) ?>">
                         <a href="index.php?tab=services">
                             <i data-lucide="briefcase"></i>
                             <span>Service Catalog</span>
@@ -327,7 +435,7 @@ function isActive($tab, $activeTab) {
                 <?php endif; ?>
 
                 <?php if (RBAC::hasPermission($user['role'], 'view_reports')): ?>
-                    <li class="sidebar-item <?= isActive('reports', $activeTab) ?>">
+                    <li class="sidebar-item item-reports <?= isActive('reports', $activeTab) ?>">
                         <a href="index.php?tab=reports">
                             <i data-lucide="bar-chart-3"></i>
                             <span>Reports & Analytics</span>
@@ -336,7 +444,7 @@ function isActive($tab, $activeTab) {
                 <?php endif; ?>
 
                 <?php if (RBAC::hasPermission($user['role'], 'edit_roles')): ?>
-                    <li class="sidebar-item <?= isActive('rbac', $activeTab) ?>">
+                    <li class="sidebar-item item-rbac <?= isActive('rbac', $activeTab) ?>">
                         <a href="index.php?tab=rbac">
                             <i data-lucide="key-round"></i>
                             <span>RBAC Policies</span>
@@ -345,7 +453,7 @@ function isActive($tab, $activeTab) {
                 <?php endif; ?>
 
                 <?php if (RBAC::hasPermission($user['role'], 'view_security_logs')): ?>
-                    <li class="sidebar-item <?= isActive('security', $activeTab) ?>">
+                    <li class="sidebar-item item-security <?= isActive('security', $activeTab) ?>">
                         <a href="index.php?tab=security">
                             <i data-lucide="shield-alert"></i>
                             <span>Security Logs</span>
@@ -354,26 +462,26 @@ function isActive($tab, $activeTab) {
                 <?php endif; ?>
 
                 <?php if ($isAdmin): ?>
-                    <li class="sidebar-item <?= isActive('templates', $activeTab) ?>">
+                    <li class="sidebar-item item-templates <?= isActive('templates', $activeTab) ?>">
                         <a href="index.php?tab=templates">
                             <i data-lucide="repeat"></i>
                             <span>Recurring Spawners</span>
                         </a>
                     </li>
-                    <li class="sidebar-item <?= isActive('requests', $activeTab) ?>">
+                    <li class="sidebar-item item-requests <?= isActive('requests', $activeTab) ?>">
                         <a href="index.php?tab=requests">
                             <i data-lucide="file-symlink"></i>
                             <span>Document Request</span>
                         </a>
                     </li>
-                    <li class="sidebar-item <?= isActive('automation', $activeTab) ?>">
+                    <li class="sidebar-item item-automation <?= isActive('automation', $activeTab) ?>">
                         <a href="index.php?tab=automation">
                             <i data-lucide="cpu"></i>
                             <span>Automation Hub</span>
                         </a>
                     </li>
                     <?php if ($user['role'] === 'super_admin'): ?>
-                        <li class="sidebar-item <?= isActive('saas', $activeTab) ?>">
+                        <li class="sidebar-item item-saas <?= isActive('saas', $activeTab) ?>">
                             <a href="index.php?tab=saas">
                                 <i data-lucide="building-2"></i>
                                 <span>SaaS Portal</span>
@@ -382,10 +490,31 @@ function isActive($tab, $activeTab) {
                     <?php endif; ?>
                 <?php endif; ?>
                 
-                <li class="sidebar-item <?= isActive('logs', $activeTab) ?>">
+                <li class="sidebar-item item-logs <?= isActive('logs', $activeTab) ?>">
                     <a href="index.php?tab=logs">
                         <i data-lucide="clock"></i>
                         <span>Work Timesheets</span>
+                    </a>
+                </li>
+                
+                <li class="sidebar-item item-requests <?= isActive('dsc', $activeTab) ?>">
+                    <a href="index.php?tab=dsc">
+                        <i data-lucide="key"></i>
+                        <span>DSC & Expiries</span>
+                    </a>
+                </li>
+                
+                <li class="sidebar-item item-clients <?= isActive('tax', $activeTab) ?>">
+                    <a href="index.php?tab=tax">
+                        <i data-lucide="calculator"></i>
+                        <span>Tax Computation</span>
+                    </a>
+                </li>
+                
+                <li class="sidebar-item item-dashboard <?= isActive('gstr', $activeTab) ?>">
+                    <a href="index.php?tab=gstr">
+                        <i data-lucide="file-check-2"></i>
+                        <span>GSTR Reconciler</span>
                     </a>
                 </li>
             </ul>
@@ -422,6 +551,9 @@ function isActive($tab, $activeTab) {
                         case 'reports': echo 'Operations Reports & Analytics'; break;
                         case 'rbac': echo 'Role-Based Access Management'; break;
                         case 'security': echo 'Security Auditing System Logs'; break;
+                        case 'dsc': echo 'DSC & Document Expiries'; break;
+                        case 'tax': echo 'Tax Computation Sheets'; break;
+                        case 'gstr': echo 'GSTR-2B vs Purchases Reconciliation'; break;
                         default: echo 'Operational & Financial Dashboard'; break;
                     }
                     ?>
@@ -662,6 +794,17 @@ function isActive($tab, $activeTab) {
                         ];
                     }
                 }
+                
+                // Expiring DSCs and Documents check (within 30 days)
+                $expiringDSCs = [];
+                $expiringDocs = [];
+                try {
+                    $stmtDSCExp = $db->query("SELECT d.*, c.name as client_name FROM dsc_tokens d JOIN clients c ON d.client_id = c.id WHERE d.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY d.expiry_date ASC");
+                    $expiringDSCs = $stmtDSCExp->fetchAll();
+                    
+                    $stmtDocExp = $db->query("SELECT de.*, c.name as client_name FROM document_expiries de JOIN clients c ON de.client_id = c.id WHERE de.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY de.expiry_date ASC");
+                    $expiringDocs = $stmtDocExp->fetchAll();
+                } catch (Exception $e) {}
             ?>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; width:100%;" class="no-print">
                     <h3 style="font-size:1.15rem; font-weight:700; color:var(--text-main); margin:0; display:flex; align-items:center; gap:0.5rem;">
@@ -671,59 +814,91 @@ function isActive($tab, $activeTab) {
                         <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i> Sync & Refresh Stats
                     </a>
                 </div>
+
+                <!-- Expiry Alerts Center -->
+                <?php if (!empty($expiringDSCs) || !empty($expiringDocs)): ?>
+                    <div class="card glass-card" style="border-left: 5px solid #f59e0b; margin-bottom: 1.5rem; background: rgba(245, 158, 11, 0.05);">
+                        <h4 style="font-weight: 700; color: #f59e0b; display:flex; align-items:center; gap:0.5rem; margin: 0 0 0.75rem 0;">
+                            <i data-lucide="alert-triangle" style="width:20px;height:20px;"></i> CA Expiry Alert Center (30 Days Warning)
+                        </h4>
+                        <div style="font-size:0.85rem; display:flex; flex-direction:column; gap:0.4rem; line-height: 1.4;">
+                            <?php foreach ($expiringDSCs as $d): 
+                                $days = round((strtotime($d['expiry_date']) - time()) / 86400);
+                                $dayStr = ($days < 0) ? "Expired" : "expires in $days days";
+                                $color = ($days < 0) ? "var(--danger)" : "#f59e0b";
+                            ?>
+                                <div>
+                                    <span style="color: <?= $color ?>; font-weight:700;"><i data-lucide="key" style="width:14px;height:14px;vertical-align:middle;margin-right:0.25rem;"></i> DSC Token:</span>
+                                    Director <strong><?= htmlspecialchars($d['director_name']) ?></strong> (<?= htmlspecialchars($d['client_name']) ?>) <?= $dayStr ?> on <strong><?= date('d M Y', strtotime($d['expiry_date'])) ?></strong>.
+                                </div>
+                            <?php endforeach; ?>
+                            <?php foreach ($expiringDocs as $doc): 
+                                $days = round((strtotime($doc['expiry_date']) - time()) / 86400);
+                                $dayStr = ($days < 0) ? "Expired" : "expires in $days days";
+                                $color = ($days < 0) ? "var(--danger)" : "#f59e0b";
+                            ?>
+                                <div>
+                                    <span style="color: <?= $color ?>; font-weight:700;"><i data-lucide="file-warning" style="width:14px;height:14px;vertical-align:middle;margin-right:0.25rem;"></i> Document Expiry:</span>
+                                    License <strong><?= htmlspecialchars($doc['doc_type']) ?></strong> (<?= htmlspecialchars($doc['client_name']) ?>) <?= $dayStr ?> on <strong><?= date('d M Y', strtotime($doc['expiry_date'])) ?></strong>.
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Advanced KPI Analytics Grid -->
                 <div class="grid-stats">
-                    <div class="stat-card glass-card">
+                    <div class="stat-card gradient-emerald-teal">
                         <div class="stat-info">
                             <span class="stat-label">Total Clients</span>
                             <span class="stat-value"><?= $stats['clients'] ?></span>
-                            <span style="font-size:0.75rem; color:var(--success); font-weight:600; margin-top:0.25rem;">+<?= count(array_filter($clientCounts)) ?> this month</span>
+                            <span style="font-size:0.75rem; color:#fff; opacity:0.9; font-weight:600; margin-top:0.25rem;">+<?= count(array_filter($clientCounts)) ?> this month</span>
                         </div>
-                        <div class="stat-icon" style="color: var(--primary);"><i data-lucide="users"></i></div>
+                        <div class="stat-icon" style="color: #fff;"><i data-lucide="users"></i></div>
                     </div>
-                    <div class="stat-card glass-card">
+                    <div class="stat-card gradient-amber-orange">
                         <div class="stat-info">
                             <span class="stat-label">Active Tasks</span>
                             <span class="stat-value"><?= $stats['tasks'] ?></span>
-                            <span style="font-size:0.75rem; color:var(--warning); font-weight:600; margin-top:0.25rem;">Pending execution</span>
+                            <span style="font-size:0.75rem; color:#fff; opacity:0.9; font-weight:600; margin-top:0.25rem;">Pending execution</span>
                         </div>
-                        <div class="stat-icon" style="color: var(--warning);"><i data-lucide="check-square"></i></div>
+                        <div class="stat-icon" style="color: #fff;"><i data-lucide="check-square"></i></div>
                     </div>
-                    <div class="stat-card glass-card">
+                    <div class="stat-card gradient-cyan-sky">
                         <div class="stat-info">
                             <span class="stat-label">Collected Revenue</span>
                             <span class="stat-value">₹<?= number_format($finStats['total_collected'], 0) ?></span>
-                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; margin-top:0.25rem;">Outstanding: ₹<?= number_format($finStats['outstanding'], 0) ?></span>
+                            <span style="font-size:0.75rem; color:#fff; opacity:0.9; font-weight:600; margin-top:0.25rem;">Outstanding: ₹<?= number_format($finStats['outstanding'], 0) ?></span>
                         </div>
-                        <div class="stat-icon" style="color: var(--success);"><i data-lucide="indian-rupee"></i></div>
+                        <div class="stat-icon" style="color: #fff;"><i data-lucide="indian-rupee"></i></div>
                     </div>
-                    <div class="stat-card glass-card">
+                    <div class="stat-card gradient-purple-pink">
                         <div class="stat-info">
                             <span class="stat-label">Filing Ratio</span>
                             <span class="stat-value"><?= $compStats['filed'] ?> / <?= $compStats['total'] ?></span>
                             <?php 
                             $ratio = $compStats['total'] > 0 ? round(($compStats['filed'] / $compStats['total']) * 100) : 100;
                             ?>
-                            <span style="font-size:0.75rem; color:#a855f7; font-weight:600; margin-top:0.25rem;"><?= $ratio ?>% Filed successfully</span>
+                            <span style="font-size:0.75rem; color:#fff; opacity:0.9; font-weight:600; margin-top:0.25rem;"><?= $ratio ?>% Filed successfully</span>
                         </div>
-                        <div class="stat-icon" style="color: #a855f7;"><i data-lucide="award"></i></div>
+                        <div class="stat-icon" style="color: #fff;"><i data-lucide="award"></i></div>
                     </div>
                     <!-- Additional Advanced KPIs -->
-                    <div class="stat-card glass-card">
+                    <div class="stat-card gradient-blue-indigo">
                         <div class="stat-info">
                             <span class="stat-label">Document Requests</span>
                             <span class="stat-value"><?= $pendingDocRequests ?></span>
-                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; margin-top:0.25rem;">Awaiting client upload</span>
+                            <span style="font-size:0.75rem; color:#fff; opacity:0.9; font-weight:600; margin-top:0.25rem;">Awaiting client upload</span>
                         </div>
-                        <div class="stat-icon" style="color: #06b6d4;"><i data-lucide="file-text"></i></div>
+                        <div class="stat-icon" style="color: #fff;"><i data-lucide="file-text"></i></div>
                     </div>
-                    <div class="stat-card glass-card">
+                    <div class="stat-card gradient-red-rose">
                         <div class="stat-info">
                             <span class="stat-label">Staff Present</span>
                             <span class="stat-value"><?= $clockedInToday ?> / <?= $totalStaff ?></span>
-                            <span style="font-size:0.75rem; color:var(--success); font-weight:600; margin-top:0.25rem;">On-duty today</span>
+                            <span style="font-size:0.75rem; color:#fff; opacity:0.9; font-weight:600; margin-top:0.25rem;">On-duty today</span>
                         </div>
-                        <div class="stat-icon" style="color: #3b82f6;"><i data-lucide="user-check"></i></div>
+                        <div class="stat-icon" style="color: #fff;"><i data-lucide="user-check"></i></div>
                     </div>
                 </div>
 
@@ -1464,6 +1639,9 @@ function isActive($tab, $activeTab) {
                                                                         </a>
                                                                         <button type="button" class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="openPdfPreview('<?= htmlspecialchars($d['file_path']) ?>', '<?= htmlspecialchars(addslashes($d['file_name'])) ?>')" title="Preview Document">
                                                                             <i data-lucide="eye" style="width:12px;height:12px;"></i>
+                                                                        </button>
+                                                                        <button type="button" class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem; color:var(--color-crm);" onclick="analyzeDocumentWithAI('<?= htmlspecialchars(addslashes($d['file_path'])) ?>', '<?= htmlspecialchars(addslashes($d['file_name'])) ?>')" title="AI Analyze Document">
+                                                                            <i data-lucide="sparkles" style="width:12px;height:12px;"></i>
                                                                         </button>
                                                                         <?php if ($d['signature_status'] !== 'signed'): ?>
                                                                             <button type="button" class="btn btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="openSignaturePad(<?= $d['id'] ?>, '<?= htmlspecialchars(addslashes($d['file_name'])) ?>')" title="Apply Signature">
@@ -6027,6 +6205,8 @@ function isActive($tab, $activeTab) {
             <!-- ================== WORK TIMESHEETS TAB ================== -->
             <?php elseif ($activeTab === 'logs'): 
                 $staffOptions = Auth::getStaffList();
+                $clientOptions = Client::getClients();
+                $logSub = trim($_GET['log_sub'] ?? 'task_logs');
                 
                 $filters = [];
                 if (!$isAdmin) {
@@ -6041,75 +6221,237 @@ function isActive($tab, $activeTab) {
                 if (!empty($endDate)) $filters['end_date'] = $endDate;
                 
                 $logsList = Task::getWorkLogs($filters);
+                $timesheetsList = OfficeSuite::getTimesheets($filters);
             ?>
-                <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                    <form action="index.php?tab=logs" method="POST" style="margin: 0;">
-                        <input type="hidden" name="action" value="export_logs">
-                        <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-                        <input type="hidden" name="user_id" value="<?= $filters['user_id'] ?? 0 ?>">
-                        <input type="hidden" name="start_date" value="<?= $startDate ?>">
-                        <input type="hidden" name="end_date" value="<?= $endDate ?>">
-                        <button type="submit" class="btn btn-primary">
-                            <i data-lucide="download" style="width:16px;height:16px;"></i> Export CSV Timesheet
-                        </button>
-                    </form>
-
-                    <form action="index.php" method="GET" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                        <input type="hidden" name="tab" value="logs">
-                        
-                        <?php if ($isAdmin): ?>
-                            <select name="user_id" class="form-control" style="width: 150px; padding: 0.5rem;" onchange="this.form.submit()">
-                                <option value="">Filter All Employees</option>
-                                <?php foreach ($staffOptions as $opt): ?>
-                                    <option value="<?= $opt['id'] ?>" <?= (($filters['user_id'] ?? 0) == $opt['id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($opt['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        <?php endif; ?>
-
-                        <input type="date" name="start_date" class="form-control" style="width: 140px; padding: 0.5rem;" value="<?= htmlspecialchars($startDate) ?>" onchange="this.form.submit()">
-                        <input type="date" name="end_date" class="form-control" style="width: 140px; padding: 0.5rem;" value="<?= htmlspecialchars($endDate) ?>" onchange="this.form.submit()">
-                        <a href="index.php?tab=logs" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Clear</a>
-                    </form>
+                <!-- Logs sub-tab navigation -->
+                <div style="display:flex; gap:1rem; border-bottom:1px solid var(--bg-card); margin-bottom:1.5rem;" class="no-print">
+                    <a href="index.php?tab=logs&log_sub=task_logs" style="padding:0.75rem 1rem; font-weight:700; border-bottom:3px solid <?= ($logSub === 'task_logs') ? 'var(--primary)' : 'transparent' ?>; color: <?= ($logSub === 'task_logs') ? 'var(--primary)' : 'var(--text-muted)' ?>;">
+                        Task Activity Logs
+                    </a>
+                    <a href="index.php?tab=logs&log_sub=hourly_timesheets" style="padding:0.75rem 1rem; font-weight:700; border-bottom:3px solid <?= ($logSub === 'hourly_timesheets') ? 'var(--primary)' : 'transparent' ?>; color: <?= ($logSub === 'hourly_timesheets') ? 'var(--primary)' : 'var(--text-muted)' ?>;">
+                        Hourly Timesheets (Billing)
+                    </a>
                 </div>
 
-                <div class="card glass-card" style="margin-top:1rem;">
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Employee</th>
-                                    <th>Client Entity</th>
-                                    <th>Task Title</th>
-                                    <th>Hours Worked</th>
-                                    <th>Details / Activity</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($logsList)): ?>
-                                    <tr>
-                                        <td colspan="6" style="text-align: center; color: var(--text-muted);">No activity hours logged matching selection.</td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($logsList as $l): ?>
-                                        <tr>
-                                            <td style="font-weight: 700;"><?= htmlspecialchars($l['log_date']) ?></td>
-                                            <td><?= htmlspecialchars($l['staff_name']) ?></td>
-                                            <td><?= htmlspecialchars($l['client_name']) ?></td>
-                                            <td style="font-weight: 600;"><?= htmlspecialchars($l['task_title']) ?></td>
-                                            <td style="font-weight: 700; color: var(--primary);"><?= htmlspecialchars($l['hours_spent']) ?></td>
-                                            <td style="color: var(--text-muted); font-size: 0.9rem;"><?= htmlspecialchars($l['description']) ?></td>
-                                        </tr>
+                <?php if ($logSub === 'task_logs'): ?>
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <form action="index.php?tab=logs" method="POST" style="margin: 0;">
+                            <input type="hidden" name="action" value="export_logs">
+                            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                            <input type="hidden" name="user_id" value="<?= $filters['user_id'] ?? 0 ?>">
+                            <input type="hidden" name="start_date" value="<?= $startDate ?>">
+                            <input type="hidden" name="end_date" value="<?= $endDate ?>">
+                            <button type="submit" class="btn btn-primary">
+                                <i data-lucide="download" style="width:16px;height:16px;"></i> Export CSV Timesheet
+                            </button>
+                        </form>
+
+                        <form action="index.php" method="GET" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <input type="hidden" name="tab" value="logs">
+                            <input type="hidden" name="log_sub" value="task_logs">
+                            
+                            <?php if ($isAdmin): ?>
+                                <select name="user_id" class="form-control" style="width: 150px; padding: 0.5rem;" onchange="this.form.submit()">
+                                    <option value="">Filter All Employees</option>
+                                    <?php foreach ($staffOptions as $opt): ?>
+                                        <option value="<?= $opt['id'] ?>" <?= (($filters['user_id'] ?? 0) == $opt['id']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($opt['name']) ?>
+                                        </option>
                                     <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                                </select>
+                            <?php endif; ?>
+
+                            <input type="date" name="start_date" class="form-control" style="width: 140px; padding: 0.5rem;" value="<?= htmlspecialchars($startDate) ?>" onchange="this.form.submit()">
+                            <input type="date" name="end_date" class="form-control" style="width: 140px; padding: 0.5rem;" value="<?= htmlspecialchars($endDate) ?>" onchange="this.form.submit()">
+                            <a href="index.php?tab=logs&log_sub=task_logs" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Clear</a>
+                        </form>
+                    </div>
+
+                    <div class="card glass-card" style="margin-top:1rem;">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Employee</th>
+                                        <th>Client Entity</th>
+                                        <th>Task Title</th>
+                                        <th>Hours Worked</th>
+                                        <th>Details / Activity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($logsList)): ?>
+                                        <tr>
+                                            <td colspan="6" style="text-align: center; color: var(--text-muted);">No activity hours logged matching selection.</td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($logsList as $l): ?>
+                                            <tr>
+                                                <td style="font-weight: 700;"><?= htmlspecialchars($l['log_date']) ?></td>
+                                                <td><?= htmlspecialchars($l['staff_name']) ?></td>
+                                                <td><?= htmlspecialchars($l['client_name']) ?></td>
+                                                <td style="font-weight: 600;"><?= htmlspecialchars($l['task_title']) ?></td>
+                                                <td style="font-weight: 700; color: var(--primary);"><?= htmlspecialchars($l['hours_spent']) ?></td>
+                                                <td style="color: var(--text-muted); font-size: 0.9rem;"><?= htmlspecialchars($l['description']) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <!-- Hourly Timesheets section -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <button class="btn btn-primary" data-open-modal="add-timesheet-modal">
+                            <i data-lucide="plus" style="width:16px;height:16px;"></i> Log Hourly Timesheet
+                        </button>
+
+                        <form action="index.php" method="GET" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <input type="hidden" name="tab" value="logs">
+                            <input type="hidden" name="log_sub" value="hourly_timesheets">
+                            
+                            <?php if ($isAdmin): ?>
+                                <select name="user_id" class="form-control" style="width: 150px; padding: 0.5rem;" onchange="this.form.submit()">
+                                    <option value="">Filter All Employees</option>
+                                    <?php foreach ($staffOptions as $opt): ?>
+                                        <option value="<?= $opt['id'] ?>" <?= (($filters['user_id'] ?? 0) == $opt['id']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($opt['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+                            <a href="index.php?tab=logs&log_sub=hourly_timesheets" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Reset</a>
+                        </form>
+                    </div>
+
+                    <div class="card glass-card" style="margin-top:1rem;">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Employee</th>
+                                        <th>Client</th>
+                                        <th>Hours</th>
+                                        <th>Activity Description</th>
+                                        <th>Billing Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($timesheetsList)): ?>
+                                        <tr>
+                                            <td colspan="7" style="text-align: center; color: var(--text-muted);">No timesheet log entries registered.</td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($timesheetsList as $ts): ?>
+                                            <tr>
+                                                <td style="font-weight: 700;"><?= date('d M Y', strtotime($ts['date_logged'])) ?></td>
+                                                <td><?= htmlspecialchars($ts['staff_name']) ?></td>
+                                                <td><?= htmlspecialchars($ts['client_name']) ?></td>
+                                                <td style="font-weight: 700; color: var(--primary);"><?= htmlspecialchars($ts['hours']) ?> hrs</td>
+                                                <td style="font-size:0.85rem; color:var(--text-muted);"><?= htmlspecialchars($ts['description']) ?></td>
+                                                <td>
+                                                    <span class="badge badge-<?= $ts['billed_status'] === 'billed' ? 'completed' : 'overdue' ?>">
+                                                        <?= htmlspecialchars($ts['billed_status']) ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div style="display:flex; gap:0.25rem; align-items:center;">
+                                                        <?php if ($ts['billed_status'] === 'pending' && $isAdmin): ?>
+                                                            <button class="btn btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="openBillTimesheetModal(<?= $ts['id'] ?>, <?= $ts['hours'] ?>)" title="Bill Timesheet">
+                                                                Bill Hours
+                                                            </button>
+                                                        <?php endif; ?>
+                                                        <form action="index.php?tab=logs&log_sub=hourly_timesheets" method="POST" style="margin:0;" onsubmit="return confirm('Delete timesheet entry?')">
+                                                            <input type="hidden" name="action" value="delete_timesheet">
+                                                            <input type="hidden" name="id" value="<?= $ts['id'] ?>">
+                                                            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                                                            <button type="submit" class="btn btn-danger" style="padding:0.25rem 0.5rem;"><i data-lucide="trash" style="width:12px;height:12px;"></i></button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Add Timesheet Modal -->
+                <div class="modal-overlay" id="add-timesheet-modal">
+                    <div class="modal-container" style="max-width:450px;">
+                        <div class="modal-header">
+                            <h3 style="font-size:1.15rem; font-weight:700;">Log Hourly Timesheet</h3>
+                            <button class="modal-close" data-close-modal="add-timesheet-modal">&times;</button>
+                        </div>
+                        <form action="index.php?tab=logs&log_sub=hourly_timesheets" method="POST" style="display:grid; gap:0.75rem;">
+                            <input type="hidden" name="action" value="add_timesheet">
+                            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                            <div class="form-group">
+                                <label class="form-label">Client Entity</label>
+                                <select name="client_id" class="form-control" required>
+                                    <option value="">Select client...</option>
+                                    <?php foreach ($clientOptions as $c): ?>
+                                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                                <div class="form-group">
+                                    <label class="form-label">Hours Worked</label>
+                                    <input type="number" name="hours" class="form-control" required min="0.1" step="0.1" value="1.0">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Date Logged</label>
+                                    <input type="date" name="date_logged" class="form-control" required value="<?= date('Y-m-d') ?>">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Activity Description</label>
+                                <textarea name="description" class="form-control" rows="3" required placeholder="Describe task worked on (e.g. GST GSTR-1 preparation, bank reconciliation)..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; padding:0.6rem; margin-top:0.5rem;">Log Timesheet</button>
+                        </form>
                     </div>
                 </div>
 
+                <!-- Bill Timesheet Modal -->
+                <div class="modal-overlay" id="bill-timesheet-modal">
+                    <div class="modal-container" style="max-width:400px;">
+                        <div class="modal-header">
+                            <h3 style="font-size:1.15rem; font-weight:700;">Bill Timesheet Hours</h3>
+                            <button class="modal-close" data-close-modal="bill-timesheet-modal">&times;</button>
+                        </div>
+                        <form action="index.php?tab=logs&log_sub=hourly_timesheets" method="POST" style="display:grid; gap:0.75rem;">
+                            <input type="hidden" name="action" value="bill_timesheet">
+                            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                            <input type="hidden" id="bill-ts-id" name="id">
+                            
+                            <div class="form-group">
+                                <label class="form-label">Total Hours to Bill</label>
+                                <input type="text" id="bill-ts-hours" class="form-control" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Hourly Rate (INR)</label>
+                                <input type="number" name="hourly_rate" class="form-control" required value="500" min="1">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; padding:0.6rem; margin-top:0.5rem;">Generate Bill Invoice</button>
+                        </form>
+                    </div>
+                </div>
 
+                <script>
+                    function openBillTimesheetModal(id, hours) {
+                        document.getElementById('bill-ts-id').value = id;
+                        document.getElementById('bill-ts-hours').value = hours + " hours";
+                        App.openModal('bill-timesheet-modal');
+                    }
+                </script>
             <!-- ================== REPORTS & ANALYTICS TAB ================== -->
             <?php elseif ($activeTab === 'reports' && $isAdmin): 
                 $rType = trim($_GET['r_type'] ?? 'revenue');
@@ -6768,10 +7110,533 @@ function isActive($tab, $activeTab) {
                                 </select>
                             </div>
 
-                            <button type="submit" class="btn btn-primary" style="width:100%; padding:0.75rem;">Register Firm Tenant</button>
+                    <button type="submit" class="btn btn-primary" style="width:100%; padding:0.75rem;">Register Firm Tenant</button>
                         </form>
                     </div>
                 </div>
+
+            <!-- ================== DSC & EXPIRIES TAB ================== -->
+            <?php elseif ($activeTab === 'dsc'): 
+                $dscTokens = OfficeSuite::getDSCTokens();
+                $docExpiries = OfficeSuite::getDocumentExpiries();
+                $clientOptions = Client::getClients();
+            ?>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;" class="no-print">
+                    <h3 style="font-size:1.25rem; font-weight:700; margin:0;">DSC & Document Expiries</h3>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn btn-primary" data-open-modal="add-dsc-modal">
+                            <i data-lucide="plus" style="width:16px; margin-right:4px;"></i> Register DSC Token
+                        </button>
+                        <button class="btn btn-secondary" data-open-modal="add-expiry-modal">
+                            <i data-lucide="plus" style="width:16px; margin-right:4px;"></i> Add Doc Expiry
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap:1.5rem;">
+                    <!-- DSC Inventory -->
+                    <div class="card glass-card">
+                        <h3 class="card-title"><i data-lucide="key" style="vertical-align:middle; margin-right:0.5rem; width:18px; color:var(--color-crm);"></i>Director DSC Inventory</h3>
+                        <div class="table-container" style="margin-top:1rem;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Director</th>
+                                        <th>Firm / Client</th>
+                                        <th>Expiry Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($dscTokens)): ?>
+                                        <tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No DSC tokens registered.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($dscTokens as $tok): 
+                                            $daysLeft = (strtotime($tok['expiry_date']) - time()) / 86400;
+                                            $statusClass = 'completed';
+                                            $statusText = 'Active';
+                                            if ($daysLeft < 0) {
+                                                $statusClass = 'overdue';
+                                                $statusText = 'Expired';
+                                            } elseif ($daysLeft <= 30) {
+                                                $statusClass = 'progress';
+                                                $statusText = 'Expiring Soon';
+                                            }
+                                        ?>
+                                            <tr>
+                                                <td style="font-weight:700;"><?= htmlspecialchars($tok['director_name']) ?></td>
+                                                <td><?= htmlspecialchars($tok['client_name']) ?></td>
+                                                <td><?= date('d M Y', strtotime($tok['expiry_date'])) ?></td>
+                                                <td><span class="badge badge-<?= $statusClass ?>"><?= $statusText ?></span></td>
+                                                <td>
+                                                    <div style="display:flex; gap:0.25rem;">
+                                                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem;" title="View Password & PIN" onclick="alert('Password Hint: <?= htmlspecialchars(addslashes($tok['password_hint'] ?: 'None')) ?>\nPIN Hint: <?= htmlspecialchars(addslashes($tok['pin_hint'] ?: 'None')) ?>')">
+                                                            <i data-lucide="info" style="width:12px;height:12px;"></i>
+                                                        </button>
+                                                        <form action="index.php?tab=dsc" method="POST" style="margin:0;" onsubmit="return confirm('Delete token?')">
+                                                            <input type="hidden" name="action" value="delete_dsc">
+                                                            <input type="hidden" name="id" value="<?= $tok['id'] ?>">
+                                                            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                                                            <button type="submit" class="btn btn-danger" style="padding:0.25rem 0.5rem;"><i data-lucide="trash" style="width:12px;height:12px;"></i></button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Other Documents Expiry Tracker -->
+                    <div class="card glass-card">
+                        <h3 class="card-title"><i data-lucide="file-text" style="vertical-align:middle; margin-right:0.5rem; width:18px; color:var(--color-saas);"></i>Critical Document Expiries</h3>
+                        <div class="table-container" style="margin-top:1rem;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Document Type</th>
+                                        <th>Client / Firm</th>
+                                        <th>Expiry Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($docExpiries)): ?>
+                                        <tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No document expiries tracked.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($docExpiries as $exp): 
+                                            $daysLeft = (strtotime($exp['expiry_date']) - time()) / 86400;
+                                            $statusClass = 'completed';
+                                            $statusText = 'Active';
+                                            if ($daysLeft < 0) {
+                                                $statusClass = 'overdue';
+                                                $statusText = 'Expired';
+                                            } elseif ($daysLeft <= 30) {
+                                                $statusClass = 'progress';
+                                                $statusText = 'Expiring Soon';
+                                            }
+                                        ?>
+                                            <tr>
+                                                <td style="font-weight:700;"><?= htmlspecialchars($exp['doc_type']) ?></td>
+                                                <td><?= htmlspecialchars($exp['client_name']) ?></td>
+                                                <td><?= date('d M Y', strtotime($exp['expiry_date'])) ?></td>
+                                                <td><span class="badge badge-<?= $statusClass ?>"><?= $statusText ?></span></td>
+                                                <td>
+                                                    <form action="index.php?tab=dsc" method="POST" style="margin:0;" onsubmit="return confirm('Delete expiry alert?')">
+                                                        <input type="hidden" name="action" value="delete_expiry">
+                                                        <input type="hidden" name="id" value="<?= $exp['id'] ?>">
+                                                        <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                                                        <button type="submit" class="btn btn-danger" style="padding:0.25rem 0.5rem;"><i data-lucide="trash" style="width:12px;height:12px;"></i></button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add DSC Modal -->
+                <div class="modal-overlay" id="add-dsc-modal">
+                    <div class="modal-container" style="max-width:450px;">
+                        <div class="modal-header">
+                            <h3 style="font-size:1.15rem; font-weight:700;">Register Director DSC</h3>
+                            <button class="modal-close" data-close-modal="add-dsc-modal">&times;</button>
+                        </div>
+                        <form action="index.php?tab=dsc" method="POST" style="display:grid; gap:0.75rem;">
+                            <input type="hidden" name="action" value="add_dsc">
+                            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                            <div class="form-group">
+                                <label class="form-label">Client Entity</label>
+                                <select name="client_id" class="form-control" required>
+                                    <option value="">Select client...</option>
+                                    <?php foreach ($clientOptions as $c): ?>
+                                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Director Name</label>
+                                <input type="text" name="director_name" class="form-control" required placeholder="e.g. Ramesh Kumar">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">DSC Expiry Date</label>
+                                <input type="date" name="expiry_date" class="form-control" required>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                                <div class="form-group">
+                                    <label class="form-label">Password Hint</label>
+                                    <input type="text" name="password_hint" class="form-control" placeholder="Optional hint">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">PIN Hint</label>
+                                    <input type="text" name="pin_hint" class="form-control" placeholder="Optional hint">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; padding:0.6rem; margin-top:0.5rem;">Register DSC</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Add Doc Expiry Modal -->
+                <div class="modal-overlay" id="add-expiry-modal">
+                    <div class="modal-container" style="max-width:450px;">
+                        <div class="modal-header">
+                            <h3 style="font-size:1.15rem; font-weight:700;">Add Document Expiry</h3>
+                            <button class="modal-close" data-close-modal="add-expiry-modal">&times;</button>
+                        </div>
+                        <form action="index.php?tab=dsc" method="POST" style="display:grid; gap:0.75rem;">
+                            <input type="hidden" name="action" value="add_expiry">
+                            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                            <div class="form-group">
+                                <label class="form-label">Client Entity</label>
+                                <select name="client_id" class="form-control" required>
+                                    <option value="">Select client...</option>
+                                    <?php foreach ($clientOptions as $c): ?>
+                                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Document/License Type</label>
+                                <input type="text" name="doc_type" class="form-control" required placeholder="e.g. Partnership Deed, IEC License, Shop Act">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Expiry Date</label>
+                                <input type="date" name="expiry_date" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%; padding:0.6rem; margin-top:0.5rem;">Add Expiry Tracker</button>
+                        </form>
+                    </div>
+                </div>
+
+            <!-- ================== TAX COMPUTATION TAB ================== -->
+            <?php elseif ($activeTab === 'tax'): 
+                $clientOptions = Client::getClients();
+                $cId = intval($_GET['calc_client_id'] ?? 0);
+                $computations = [];
+                if ($cId > 0) {
+                    $computations = OfficeSuite::getTaxComputations($cId);
+                }
+            ?>
+                <div class="card glass-card">
+                    <h3 class="card-title"><i data-lucide="calculator" style="vertical-align:middle; margin-right:0.5rem; width:18px; color:var(--color-crm);"></i>Income Tax Computation (New vs Old Regime)</h3>
+                    
+                    <form action="index.php" method="GET" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1.5rem;" class="no-print">
+                        <input type="hidden" name="tab" value="tax">
+                        <select name="calc_client_id" class="form-control" style="width:250px; padding:0.5rem;" onchange="this.form.submit()">
+                            <option value="">Select Client/Entity...</option>
+                            <?php foreach ($clientOptions as $opt): ?>
+                                <option value="<?= $opt['id'] ?>" <?= ($cId == $opt['id']) ? 'selected' : '' ?>><?= htmlspecialchars($opt['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="submit" class="btn btn-primary">Load History</button>
+                    </form>
+
+                    <?php if ($cId > 0): ?>
+                        <div style="display:grid; grid-template-columns:1fr 1.2fr; gap:1.5rem;">
+                            <!-- Calculator Form -->
+                            <div>
+                                <h4 style="font-weight:700; margin-bottom:0.75rem;">Income Details (FY 2025-26)</h4>
+                                <form action="index.php?tab=tax&calc_client_id=<?= $cId ?>" method="POST" style="display:grid; gap:0.75rem;">
+                                    <input type="hidden" name="action" value="add_tax_computation">
+                                    <input type="hidden" name="client_id" value="<?= $cId ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                                    
+                                    <div class="form-group">
+                                        <label class="form-label">Financial Year</label>
+                                        <select name="financial_year" class="form-control" required>
+                                            <option value="2025-26">FY 2025-26 (AY 2026-27)</option>
+                                            <option value="2024-25">FY 2024-25 (AY 2025-26)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Gross Salary Income</label>
+                                        <input type="number" name="gross_salary" class="form-control" value="0" step="any">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Income from House Property (Net)</label>
+                                        <input type="number" name="house_property" class="form-control" value="0" step="any">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Capital Gains Income</label>
+                                        <input type="number" name="cap_gains" class="form-control" value="0" step="any">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Profits/Gains of Business or Profession</label>
+                                        <input type="number" name="business_income" class="form-control" value="0" step="any">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Income from Other Sources</label>
+                                        <input type="number" name="other_sources" class="form-control" value="0" step="any">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Deductions (Section 80C, 80D etc. - Old Regime Only)</label>
+                                        <input type="number" name="deductions_old" class="form-control" value="0" step="any">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="padding:0.75rem; margin-top:0.5rem;">Compute & Save Calculation</button>
+                                </form>
+                            </div>
+
+                            <!-- Historical Computations -->
+                            <div>
+                                <h4 style="font-weight:700; margin-bottom:0.75rem;">Filing & Computation History</h4>
+                                <div style="display:flex; flex-direction:column; gap:0.75rem; max-height:480px; overflow-y:auto; padding-right:0.25rem;">
+                                    <?php if (empty($computations)): ?>
+                                        <p style="color:var(--text-muted); font-style:italic;">No historical computations logged for this client.</p>
+                                    <?php else: ?>
+                                        <?php foreach ($computations as $comp): ?>
+                                            <div class="card glass-card" style="padding:1rem;">
+                                                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:0.5rem; margin-bottom:0.5rem;">
+                                                    <span style="font-weight:700; color:var(--primary);">FY <?= htmlspecialchars($comp['financial_year']) ?></span>
+                                                    <form action="index.php?tab=tax&calc_client_id=<?= $cId ?>" method="POST" style="margin:0;">
+                                                        <input type="hidden" name="action" value="delete_tax_computation">
+                                                        <input type="hidden" name="id" value="<?= $comp['id'] ?>">
+                                                        <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                                                        <button type="submit" class="btn btn-danger" style="padding:0.15rem 0.35rem; font-size:0.7rem;"><i data-lucide="trash" style="width:12px;height:12px;"></i></button>
+                                                    </form>
+                                                </div>
+                                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.8rem; line-height:1.5;">
+                                                    <span>Gross Income: <strong>₹<?= number_format($comp['gross_salary']+$comp['house_property']+$comp['cap_gains']+$comp['business_income']+$comp['other_sources'], 2) ?></strong></span>
+                                                    <span>Deductions (Old): <strong>₹<?= number_format($comp['deductions_old'], 2) ?></strong></span>
+                                                    <span style="color:var(--text-muted);">Tax (Old Regime): <strong style="color:var(--text-main);">₹<?= number_format($comp['tax_old'], 2) ?></strong></span>
+                                                    <span style="color:var(--text-muted);">Tax (New Regime): <strong style="color:var(--text-main);">₹<?= number_format($comp['tax_new'], 2) ?></strong></span>
+                                                    <div style="grid-column: span 2; margin-top:0.25rem;">
+                                                        <span class="badge badge-completed" style="font-size:0.75rem;">Preferred: <?= htmlspecialchars($comp['preferred_regime']) ?></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div style="text-align:center; padding:3rem; color:var(--text-muted);">
+                            <i data-lucide="calculator" style="width:3rem; height:3rem; opacity:0.3; margin-bottom:1rem;"></i>
+                            <p>Please select a client from the dropdown above to load computation forms and history.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+            <!-- ================== GSTR RECONCILER TAB ================== -->
+            <?php elseif ($activeTab === 'gstr'): ?>
+                <div class="card glass-card">
+                    <h3 class="card-title"><i data-lucide="file-check-2" style="vertical-align:middle; margin-right:0.5rem; width:18px; color:var(--color-saas);"></i>GSTR-2B vs. Purchases Reconciliation</h3>
+                    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.5rem;">Upload the GSTR-2B JSON file and your client's Purchase Ledger (CSV format) to match Input Tax Credit (ITC) instantly. All parsing is done locally in your browser.</p>
+                    
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;" class="no-print">
+                        <div class="card glass-card" style="padding:1.25rem; border:2px dashed rgba(255,255,255,0.08);">
+                            <label class="form-label" style="font-weight:700;"><i data-lucide="file-json" style="vertical-align:middle; margin-right:0.25rem; width:16px;"></i> 1. Upload GSTR-2B (JSON)</label>
+                            <input type="file" id="gstr2b-file" class="form-control" accept=".json" style="margin-top:0.5rem;">
+                        </div>
+                        <div class="card glass-card" style="padding:1.25rem; border:2px dashed rgba(255,255,255,0.08);">
+                            <label class="form-label" style="font-weight:700;"><i data-lucide="file-spreadsheet" style="vertical-align:middle; margin-right:0.25rem; width:16px;"></i> 2. Upload Purchases Ledger (CSV)</label>
+                            <input type="file" id="purchases-file" class="form-control" accept=".csv" style="margin-top:0.5rem;">
+                            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.5rem;">Required headers: <code>GSTIN, InvoiceNumber, InvoiceDate, InvoiceValue, CGST, SGST, IGST</code></div>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align:center;" class="no-print">
+                        <button type="button" class="btn btn-primary" style="padding:0.75rem 2rem; font-weight:700;" onclick="runGSTRReconciliation()">
+                            <i data-lucide="sparkles" style="width:16px; margin-right:4px;"></i> Run Reconciliation Matching
+                        </button>
+                    </div>
+
+                    <!-- Comparison Results Dashboard (hidden initially) -->
+                    <div id="reconcile-dashboard" style="display:none; margin-top:2rem; flex-direction:column; gap:1.5rem;">
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem;">
+                            <div class="stat-card gradient-emerald-teal">
+                                <div class="stat-info">
+                                    <span class="stat-label">Perfect Match</span>
+                                    <span id="match-count" class="stat-value">0</span>
+                                </div>
+                                <div style="font-size:1.75rem;"><i data-lucide="check-circle-2"></i></div>
+                            </div>
+                            <div class="stat-card gradient-amber-orange">
+                                <div class="stat-info">
+                                    <span class="stat-label">Tax Mismatches</span>
+                                    <span id="mismatch-count" class="stat-value">0</span>
+                                </div>
+                                <div style="font-size:1.75rem;"><i data-lucide="alert-circle"></i></div>
+                            </div>
+                            <div class="stat-card gradient-blue-indigo">
+                                <div class="stat-info">
+                                    <span class="stat-label">Missing in Ledger</span>
+                                    <span id="missing-ledger-count" class="stat-value">0</span>
+                                </div>
+                                <div style="font-size:1.75rem;"><i data-lucide="file-question"></i></div>
+                            </div>
+                            <div class="stat-card gradient-red-rose">
+                                <div class="stat-info">
+                                    <span class="stat-label">Missing in GSTR-2B</span>
+                                    <span id="missing-gstr-count" class="stat-value">0</span>
+                                </div>
+                                <div style="font-size:1.75rem;"><i data-lucide="x-circle"></i></div>
+                            </div>
+                        </div>
+
+                        <div class="card glass-card">
+                            <h4 style="font-weight:700;">Reconciliation Details Table</h4>
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice No</th>
+                                            <th>Vendor GSTIN</th>
+                                            <th>GSTR-2B Value</th>
+                                            <th>Ledger Value</th>
+                                            <th>Status Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reconcile-table-body">
+                                        <!-- Javascript injected rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    function parseCSV(text) {
+                        const lines = text.split('\n');
+                        if (lines.length === 0) return [];
+                        const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+                        const result = [];
+                        
+                        for (let i = 1; i < lines.length; i++) {
+                            if (!lines[i].trim()) continue;
+                            const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+                            const row = {};
+                            headers.forEach((header, idx) => {
+                                row[header] = cols[idx] || '';
+                            });
+                            result.push(row);
+                        }
+                        return result;
+                    }
+
+                    function runGSTRReconciliation() {
+                        const gstrFile = document.getElementById('gstr2b-file').files[0];
+                        const ledgerFile = document.getElementById('purchases-file').files[0];
+
+                        if (!gstrFile || !ledgerFile) {
+                            alert('Please upload both the GSTR-2B JSON file and the Purchase Ledger CSV file.');
+                            return;
+                        }
+
+                        Promise.all([
+                            gstrFile.text().then(t => JSON.parse(t)),
+                            ledgerFile.text().then(t => parseCSV(t))
+                        ]).then(([gstr, ledger]) => {
+                            const gstrInvoices = {};
+                            if (gstr.b2b) {
+                                gstr.b2b.forEach(b2b => {
+                                    const ctin = b2b.ctin;
+                                    if (b2b.inv) {
+                                        b2b.inv.forEach(inv => {
+                                            const invNo = inv.inum;
+                                            gstrInvoices[invNo] = {
+                                                gstin: ctin,
+                                                inum: invNo,
+                                                val: parseFloat(inv.val || 0),
+                                                cgst: parseFloat(inv.camt || 0),
+                                                sgst: parseFloat(inv.samt || 0),
+                                                igst: parseFloat(inv.iamt || 0),
+                                                matched: false
+                                            };
+                                        });
+                                    }
+                                });
+                            }
+
+                            let perfectMatch = 0;
+                            let mismatchVal = 0;
+                            let missingLedger = 0;
+                            let missingGstr = 0;
+                            const tableRows = [];
+
+                            ledger.forEach(row => {
+                                const invNo = row.InvoiceNumber;
+                                const gstin = row.GSTIN;
+                                const val = parseFloat(row.InvoiceValue || 0);
+
+                                if (invNo && gstrInvoices[invNo]) {
+                                    gstrInvoices[invNo].matched = true;
+                                    const gVal = gstrInvoices[invNo].val;
+                                    if (Math.abs(gVal - val) < 2) {
+                                        perfectMatch++;
+                                        tableRows.push(`
+                                            <tr>
+                                                <td style="font-weight:700;">${invNo}</td>
+                                                <td>${gstin}</td>
+                                                <td>₹${gVal.toLocaleString('en-IN')}</td>
+                                                <td>₹${val.toLocaleString('en-IN')}</td>
+                                                <td><span class="badge badge-completed">Perfect Match</span></td>
+                                            </tr>
+                                        `);
+                                    } else {
+                                        mismatchVal++;
+                                        tableRows.push(`
+                                            <tr>
+                                                <td style="font-weight:700;">${invNo}</td>
+                                                <td>${gstin}</td>
+                                                <td>₹${gVal.toLocaleString('en-IN')}</td>
+                                                <td style="color:var(--warning); font-weight:700;">₹${val.toLocaleString('en-IN')}</td>
+                                                <td><span class="badge badge-progress">Value Mismatch (Diff: ₹${Math.abs(gVal-val).toFixed(2)})</span></td>
+                                            </tr>
+                                        `);
+                                    }
+                                } else if (invNo) {
+                                    missingGstr++;
+                                    tableRows.push(`
+                                        <tr>
+                                            <td style="font-weight:700;">${invNo}</td>
+                                            <td>${gstin}</td>
+                                            <td>-</td>
+                                            <td>₹${val.toLocaleString('en-IN')}</td>
+                                            <td><span class="badge badge-overdue">Missing in GSTR-2B</span></td>
+                                        </tr>
+                                    `);
+                                }
+                            });
+
+                            Object.keys(gstrInvoices).forEach(invNo => {
+                                if (!gstrInvoices[invNo].matched) {
+                                    missingLedger++;
+                                    tableRows.push(`
+                                        <tr>
+                                            <td style="font-weight:700;">${invNo}</td>
+                                            <td>${gstrInvoices[invNo].gstin}</td>
+                                            <td>₹${gstrInvoices[invNo].val.toLocaleString('en-IN')}</td>
+                                            <td>-</td>
+                                            <td><span class="badge badge-outline" style="border-color:var(--primary); color:var(--primary);">Missing in Purchase Ledger</span></td>
+                                        </tr>
+                                    `);
+                                }
+                            });
+
+                            document.getElementById('match-count').innerText = perfectMatch;
+                            document.getElementById('mismatch-count').innerText = mismatchVal;
+                            document.getElementById('missing-ledger-count').innerText = missingLedger;
+                            document.getElementById('missing-gstr-count').innerText = missingGstr;
+                            document.getElementById('reconcile-table-body').innerHTML = tableRows.join('');
+
+                            document.getElementById('reconcile-dashboard').style.display = 'flex';
+                            if (typeof lucide !== 'undefined') lucide.createIcons();
+                        }).catch(err => {
+                            console.error(err);
+                            alert('Failed to run reconciliation. Please ensure your files are in the correct format.');
+                        });
+                    }
+                </script>
             <?php endif; ?>
         </main>
     </div>
@@ -6787,6 +7652,76 @@ function isActive($tab, $activeTab) {
     <?php if (!empty($error)): ?>
         <script>window.addEventListener('DOMContentLoaded', () => showToast(<?= json_encode($error) ?>, 'danger'));</script>
     <?php endif; ?>
+
+    <!-- AI Document Analysis Modal -->
+    <div class="modal-overlay" id="ai-document-analysis-modal">
+        <div class="modal-container" style="max-width:600px; width:95%;">
+            <div class="modal-header">
+                <h3 style="font-size:1.15rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; color:var(--color-crm);">
+                    <i data-lucide="sparkles" style="width:18px; height:18px;"></i> AI Document Parser Insights
+                </h3>
+                <button class="modal-close" data-close-modal="ai-document-analysis-modal">&times;</button>
+            </div>
+            <div id="ai-loading-state" style="text-align:center; padding:3rem 0;">
+                <div style="width:3rem; height:3rem; border:4px solid var(--bg-card); border-top-color:var(--color-crm); border-radius:50%; animation:loadingSkeleton 1s linear infinite; margin:0 auto 1.5rem auto;"></div>
+                <div style="font-weight:600; color:var(--text-main);">AI is analyzing the document...</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.5rem;">Extracting structure, taxpayer names, tax identifiers, and warnings.</div>
+            </div>
+            <div id="ai-result-state" style="display:none; flex-direction:column; gap:1.25rem;">
+                <div class="stat-card gradient-emerald-teal" style="padding: 1.25rem;">
+                    <div>
+                        <div style="font-size: 0.8rem; text-transform: uppercase; font-weight: 600; opacity: 0.8;">Document Type Identified</div>
+                        <h2 id="ai-doc-type" style="font-size: 1.5rem; font-weight: 800; margin-top: 0.25rem;">-</h2>
+                    </div>
+                    <div style="font-size: 1.75rem;"><i data-lucide="file-check"></i></div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                    <div class="card glass-card" style="padding:1rem; gap:0.25rem;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Taxpayer Name</span>
+                        <span id="ai-doc-name" style="font-weight:700; font-size:0.95rem;">-</span>
+                    </div>
+                    <div class="card glass-card" style="padding:1rem; gap:0.25rem;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Financial Year</span>
+                        <span id="ai-doc-fy" style="font-weight:700; font-size:0.95rem;">-</span>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                    <div class="card glass-card" style="padding:1rem; gap:0.25rem;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">PAN Number</span>
+                        <span id="ai-doc-pan" style="font-weight:700; color:var(--primary); font-size:0.95rem;">-</span>
+                    </div>
+                    <div class="card glass-card" style="padding:1rem; gap:0.25rem;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">GSTIN</span>
+                        <span id="ai-doc-gstin" style="font-weight:700; color:var(--success); font-size:0.95rem;">-</span>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                    <div class="card glass-card" style="padding:1rem; gap:0.25rem;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Total Amount</span>
+                        <span id="ai-doc-amount" style="font-weight:700; font-size:0.95rem;">-</span>
+                    </div>
+                    <div class="card glass-card" style="padding:1rem; gap:0.25rem;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Verification Status</span>
+                        <span id="ai-doc-status" class="badge" style="width:fit-content; font-size:0.75rem; margin-top:0.15rem;">-</span>
+                    </div>
+                </div>
+
+                <div class="card glass-card" style="padding:1rem; border-left:4px solid var(--danger);">
+                    <div style="font-weight:700; font-size:0.85rem; color:var(--danger); display:flex; align-items:center; gap:0.35rem;">
+                        <i data-lucide="alert-triangle" style="width:14px; height:14px;"></i> Warnings & Flags
+                    </div>
+                    <ul id="ai-doc-warnings" style="font-size:0.8rem; line-height:1.4; margin-top:0.5rem; padding-left:1.25rem; display:flex; flex-direction:column; gap:0.25rem;">
+                        <!-- Warnings list -->
+                    </ul>
+                </div>
+
+                <button type="button" class="btn btn-secondary" data-close-modal="ai-document-analysis-modal" style="padding:0.75rem; font-weight:600;">Close Insights</button>
+            </div>
+        </div>
+    </div>
 
     <!-- PDF Preview Modal -->
     <div class="modal-overlay" id="pdf-preview-modal">
@@ -6965,6 +7900,112 @@ function isActive($tab, $activeTab) {
                 }, false);
             }
         });
+
+        // AI Dynamic Checklist Helper
+        function suggestAISubtasks() {
+            const titleInput = document.getElementById('t-title');
+            const descTextarea = document.getElementById('t-desc');
+            if (!titleInput || !titleInput.value.trim()) {
+                alert('Please enter a Task Title first.');
+                return;
+            }
+            
+            const btn = document.querySelector('button[onclick="suggestAISubtasks()"]');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width:12px; height:12px;"></i> Generating...';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            fetch('index.php?action=ai_query&type=subtasks&title=' + encodeURIComponent(titleInput.value.trim()))
+                .then(res => res.json())
+                .then(data => {
+                    if (data.subtasks) {
+                        const existingVal = descTextarea.value.trim();
+                        descTextarea.value = (existingVal ? existingVal + "\n\n" : "") + "AI Checklist:\n" + data.subtasks;
+                    } else {
+                        alert('Could not generate subtasks from AI.');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error calling AI service.');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                });
+        }
+
+        // AI Document Parser Helper
+        function getMimeType(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            if (ext === 'pdf') return 'application/pdf';
+            if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+            if (ext === 'png') return 'image/png';
+            if (ext === 'webp') return 'image/webp';
+            return 'application/octet-stream';
+        }
+
+        function analyzeDocumentWithAI(filePath, fileName) {
+            const mime = getMimeType(fileName);
+            
+            // Open modal
+            const modal = document.getElementById('ai-document-analysis-modal');
+            if (!modal) return;
+            
+            document.getElementById('ai-loading-state').style.display = 'block';
+            document.getElementById('ai-result-state').style.display = 'none';
+            App.openModal('ai-document-analysis-modal');
+            
+            fetch('index.php?action=ai_query&type=parse_doc&file_path=' + encodeURIComponent(filePath) + '&mime_type=' + encodeURIComponent(mime))
+                .then(res => res.json())
+                .then(res => {
+                    document.getElementById('ai-loading-state').style.display = 'none';
+                    if (res.success && res.data) {
+                        const d = res.data;
+                        document.getElementById('ai-doc-type').innerText = d.DocumentType || 'Unknown';
+                        document.getElementById('ai-doc-name').innerText = d.TaxpayerName || 'Not Found';
+                        document.getElementById('ai-doc-fy').innerText = d.FinancialYear || 'Not Found';
+                        document.getElementById('ai-doc-pan').innerText = d.PAN || 'N/A';
+                        document.getElementById('ai-doc-gstin').innerText = d.GSTIN || 'N/A';
+                        document.getElementById('ai-doc-amount').innerText = d.TotalAmount ? '₹' + Number(d.TotalAmount).toLocaleString('en-IN') : 'N/A';
+                        
+                        const statusBadge = document.getElementById('ai-doc-status');
+                        statusBadge.innerText = d.VerificationStatus || 'Suspect';
+                        statusBadge.className = 'badge badge-' + ((d.VerificationStatus === 'Valid') ? 'completed' : 'danger');
+
+                        const warningsList = document.getElementById('ai-doc-warnings');
+                        warningsList.innerHTML = '';
+                        if (d.Warnings && d.Warnings.length > 0) {
+                            d.Warnings.forEach(w => {
+                                const li = document.createElement('li');
+                                li.innerText = w;
+                                warningsList.appendChild(li);
+                            });
+                        } else {
+                            const li = document.createElement('li');
+                            li.innerText = 'No anomalies detected.';
+                            li.style.listStyle = 'none';
+                            li.style.color = 'var(--text-muted)';
+                            warningsList.appendChild(li);
+                        }
+
+                        document.getElementById('ai-result-state').style.display = 'flex';
+                    } else {
+                        alert(res.message || 'AI failed to analyze document.');
+                        App.closeModal('ai-document-analysis-modal');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error calling AI document parser.');
+                    App.closeModal('ai-document-analysis-modal');
+                })
+                .finally(() => {
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                });
+        }
     </script>
     <script src="js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 </body>

@@ -163,6 +163,57 @@ try {
         echo "Enqueued overdue invoice warning for invoice: " . $i['invoice_number'] . "\n";
     }
 
+    // 8b. Scan for expiring DSC tokens (within 30 days)
+    echo "Running DSC Token expiry reminder checks...\n";
+    $stmtDSC = $db->query("
+        SELECT d.*, cl.email as client_email, cl.name as client_name 
+        FROM dsc_tokens d
+        JOIN clients cl ON d.client_id = cl.id
+        WHERE d.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+          AND d.expiry_date >= CURDATE()
+    ");
+    $expiringDSC = $stmtDSC->fetchAll();
+    foreach ($expiringDSC as $d) {
+        $subject = "Urgent: Digital Signature (DSC) Expiring Soon for " . $d['director_name'];
+        $body = "Dear " . $d['client_name'] . ",\n\nThis is an automated reminder that the Digital Signature Certificate (DSC) for Director '" . $d['director_name'] . "' is set to expire on " . $d['expiry_date'] . ".\n\nPlease take immediate steps to renew the certificate to avoid any statutory filing disruptions.\n\nBest Regards,\nCA CRM Automated System.";
+        
+        $stmtEnqueue->execute([
+            'event_type' => 'dsc_expiry_warning',
+            'email' => $d['client_email'],
+            'subject' => $subject,
+            'body' => $body
+        ]);
+        
+        $stmtWhatsApp->execute([
+            'client_id' => $d['client_id'],
+            'message' => "Automated Expiry Alert: DSC for Director '" . $d['director_name'] . "' expires on " . $d['expiry_date'] . ". Please renew soon."
+        ]);
+        echo "Enqueued DSC expiry reminder for director: " . $d['director_name'] . "\n";
+    }
+
+    // 8c. Scan for expiring critical documents (within 30 days)
+    echo "Running Document Expiry checks...\n";
+    $stmtDoc = $db->query("
+        SELECT de.*, cl.email as client_email, cl.name as client_name 
+        FROM document_expiries de
+        JOIN clients cl ON de.client_id = cl.id
+        WHERE de.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+          AND de.expiry_date >= CURDATE()
+    ");
+    $expiringDocs = $stmtDoc->fetchAll();
+    foreach ($expiringDocs as $doc) {
+        $subject = "Document Expiry Reminder: " . $doc['doc_type'];
+        $body = "Dear " . $doc['client_name'] . ",\n\nThis is an automated reminder that your critical document / registration license '" . $doc['doc_type'] . "' is set to expire on " . $doc['expiry_date'] . ".\n\nPlease upload the renewed document to the Client Vault once obtained.\n\nBest Regards,\nCA CRM Automated System.";
+        
+        $stmtEnqueue->execute([
+            'event_type' => 'doc_expiry_warning',
+            'email' => $doc['client_email'],
+            'subject' => $subject,
+            'body' => $body
+        ]);
+        echo "Enqueued document expiry reminder for doc type: " . $doc['doc_type'] . "\n";
+    }
+
     // 9. Process Pending Queue Items
     $stmtPending = $db->query("SELECT * FROM automation_queue WHERE status = 'pending'");
     $queue = $stmtPending->fetchAll();
